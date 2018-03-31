@@ -63,4 +63,9 @@ Here is an overview of which NetFS operations are currently working
 
 # Implementation details
 
+Currently access attributes (owner / public and locked) are not checked by any routine, so every user can access any file.
 
+Directories should be correctly identified as Owner and Public based on the user root directory in their profile
+
+It's undefined how any existing files on the SD card will be handled if they break the NetFS naming rules. Also these rules
+are not checked in several places, so it is possible to create an illegal NetFS name with \*CDIR or \*RENAME
