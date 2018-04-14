@@ -1177,9 +1177,8 @@ void fsLoad(int txPort,boolean loadAs){
       }
     }
   } else {
-    //Load as operation - Check CSD and Lib
-    fatPath=convertToFATPath(objectName, getCSD(usrHdl), txPort);
-    fatPath.toCharArray(pathBuff1, 128);
+    //Load as operation - Already have file based on CSD, get Lib path too
+
     String libPath=convertToFATPath(objectName, getLib(usrHdl), txPort);
     libPath.toCharArray(pathBuff4, 128);
 
@@ -1190,7 +1189,7 @@ void fsLoad(int txPort,boolean loadAs){
         //Object not found in library either - send bad command as it's a load as operation
 
         Serial.print(" - ");
-        fsError(0xFE,F("Bad command"),txPort);
+        fsError(0xFE,"Bad command",txPort);
         return;
         
       } else {
