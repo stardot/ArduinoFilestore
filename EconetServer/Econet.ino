@@ -418,7 +418,7 @@ boolean txScoutFrame(){
 }
 
 boolean waitIdle(){
-  //Wait for network to become idle, returns false if network error or if not idel in 5 seconds.
+  //Wait for network to become idle, returns false if network error or if not idle in 2 seconds.
   unsigned int byte1;
   int sr1,sr2; 
 
@@ -441,7 +441,7 @@ boolean waitIdle(){
     }
     
     if (millis()>timeOut){
-      Serial.println("Network not idle for 2 seconds");
+      Serial.println("Network not idle for 2 seconds - Line Jammed");
       return(false);
     }
 

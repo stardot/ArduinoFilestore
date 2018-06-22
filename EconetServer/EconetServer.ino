@@ -36,9 +36,9 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define PROFILE_URD 34
 
 // Protocol retries and timeouts set here!
-#define SCOUTTIMEOUT 750 // Milliseconds
-#define TXTIMEOUT 2000 // milliseconds
-#define TXRETRIES 5 // Number of times to retry a failed frame TX
+#define SCOUTTIMEOUT 1000 // Milliseconds
+#define TXTIMEOUT 1000 // milliseconds
+#define TXRETRIES 50 // Number of times to retry a failed frame TX
 #define TXRETRYDELAY 100 //mS to wait between frame retries
 
 #define BUFFSIZE 4096 // Size of TX, RX and work buffers
@@ -88,8 +88,6 @@ byte rxControlByte=255;
 
 // Reserve space for server tables
 char userURD[DIRENTRYSIZE*MAXUSERS];
-char userCSD[DIRENTRYSIZE*MAXUSERS];
-char userLib[DIRENTRYSIZE*MAXUSERS];
 byte netaddress[MAXUSERS];
 byte stataddress[MAXUSERS];
 byte userCSDhdl[MAXUSERS];
@@ -114,7 +112,7 @@ boolean isSave[MAXFILES]; // Is the bulk upload a save (function 1) operation?
 
 void setup() {
   
-  Serial.begin(115200); // Make sure this matched your console, otherwise you will get no further running this!
+  Serial.begin(115200); // Make sure this matches your console, otherwise you will get no further running this!
   
   while (!Serial) {
     ; // wait for serial console to connect

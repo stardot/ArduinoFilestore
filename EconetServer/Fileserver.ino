@@ -233,7 +233,7 @@ void fsOperation (int bytes){
         }
       } 
       Serial.println (F(" "));
-      fsError(0xFF,"FS command unknown",replyPort);
+      if (fsCommand < 100) fsError(0xFF,"FS command unknown",replyPort);
       break;
   }
   
@@ -344,24 +344,22 @@ void fsLogin(byte txPort, String command, int bytesRX){
   userOpenFiles[usrHdl]=0;
   stataddress[usrHdl]=rxBuff[2];
   netaddress[usrHdl]=rxBuff[3];
-  setURD(usrHdl,profileURD);
-  setCSD(usrHdl,profileURD);
-  setLib(usrHdl,"/export/Library");
   
-  userCSDhdl[usrHdl]=openFolder(usrHdl,profileURD);
-  userLibhdl[usrHdl]=openFolder(usrHdl,"/export/Library");
+  byte uCSDhdl=openFolder(usrHdl,profileURD);
+  byte uLibhdl=openFolder(usrHdl,"/export/Library");
 
-  if (userCSDhdl[usrHdl]==0 || userLibhdl[usrHdl]==0){
+  if (uCSDhdl==0 || uLibhdl==0){
     // Run out of file handles
     fsError(0xc0,"Too many open files ",txPort);    
     //return;
   }
 
-  txBuff[6]=255; // new URD 
-  txBuff[7]=getUserCSDhandle(usrHdl); // new CSD
-  txBuff[8]=getUserLibhandle(usrHdl); // new Lib
-
   
+  txBuff[6]=255; // new URD 
+  txBuff[7]=uCSDhdl; // new CSD
+  txBuff[8]=uLibhdl; // new Lib
+  
+
   
   // Write the user to the name buffer
   uPtr=userName;
@@ -374,13 +372,13 @@ void fsLogin(byte txPort, String command, int bytesRX){
   Serial.print(F(", URD: "));
   Serial.print(getURD(usrHdl));
   Serial.print(F(", CSD: "));
-  Serial.print(getCSD(usrHdl));
+  Serial.print(getFilePath(uCSDhdl));
   Serial.print(F(" ("));
-  Serial.print(getUserCSDhandle(usrHdl));
+  Serial.print(uCSDhdl);
   Serial.print(F("), Library: "));
-  Serial.print(getLib(usrHdl));
+  Serial.print(getFilePath(uLibhdl));
   Serial.print(F(" ("));
-  Serial.print(getUserLibhandle(usrHdl));
+  Serial.print(uLibhdl);
   Serial.print(F(")"));
   
   if (txWithHandshake(10,txPort,0x80)) Serial.println(F(" - Login successful")); else Serial.println(F(" - Failed to TX result."));
@@ -452,8 +450,6 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
       return;
     }
     
-    setLib(usrHdl,fatPath);
-
     txBuff[4]=9; // library command code
     txBuff[5]=0; // Is successful
     txBuff[6]=dirHdl; // new library handle
@@ -469,7 +465,6 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
       return;
     }
     
-    setCSD(usrHdl,fatPath);
     txBuff[4]=7; // directory command code
     txBuff[5]=0; // Is successful
     txBuff[6]=dirHdl; // new CSD handle
@@ -1134,7 +1129,7 @@ void fsLoad(int txPort,boolean loadAs){
   }
 
   byte dataTXPort=rxBuff[6];
-  String workingDir;
+  String workingDir, libraryPath;
   
   workingDir=getDirectoryPath(usrHdl,rxBuff[7]);
   
@@ -1178,9 +1173,8 @@ void fsLoad(int txPort,boolean loadAs){
     }
   } else {
     //Load as operation - Already have file based on CSD, get Lib path too
-
-    String libPath=convertToFATPath(objectName, getLib(usrHdl), txPort);
-    libPath.toCharArray(pathBuff4, 128);
+    libraryPath=getDirectoryPath(usrHdl,rxBuff[8]);
+    libraryPath.toCharArray(pathBuff4, 128);
 
     if(!sd.exists(pathBuff1)){
       // Not found in CSD
@@ -3073,9 +3067,9 @@ void fsReadUserEnv(byte txPort){
     fsError(0xBF,F("Who are you?"),txPort);
     return;
   }
-  
-  String csd=getCSD(usrHdl);
-  String lib=getLib(usrHdl);
+
+  String csdPath=getDirectoryPath(usrHdl,rxBuff[7]);
+  String libPath=getDirectoryPath(usrHdl,rxBuff[8]);
   
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
@@ -3088,7 +3082,7 @@ void fsReadUserEnv(byte txPort){
   String diskName=FSNAME;
   writeStringtoTX(diskName, 7, 16); // diskname
 
-  String fcPath=convertToFilecorePath(csd);
+  String fcPath=convertToFilecorePath(csdPath);
   if (fcPath.length()>2) {
     String dirName;
     int ptr=fcPath.length()-2;
@@ -3104,7 +3098,7 @@ void fsReadUserEnv(byte txPort){
     writeStringtoTX(fcPath, 23, 10);
   }
 
-  fcPath=convertToFilecorePath(lib);
+  fcPath=convertToFilecorePath(libPath);
   if (fcPath.length()>2) {
     String dirName;
     int ptr=fcPath.length()-2;
@@ -3896,39 +3890,6 @@ String readBuff(char *buff, int start, int limit){
   return output;
 }
 
-boolean setCSD(int uhdl, String newpath){
-  char* ptr = NULL;
-  char path[DIRENTRYSIZE+1];
-
-  if (uhdl>MAXUSERS) return false;
-  if (newpath.length()>DIRENTRYSIZE) return false;
-
-  ptr=&userCSD[0];
-  ptr+=(uhdl*DIRENTRYSIZE);
-  
-  newpath.toCharArray(path,DIRENTRYSIZE);
-  strcpy(ptr,path);
-
-  return (true);  
-}
-
-boolean setLib(int uhdl, String newpath){
-  char* ptr = NULL;
-  char path[DIRENTRYSIZE+1];
-
-
-  if (uhdl>MAXUSERS) return false;
-  if (newpath.length()>DIRENTRYSIZE) return false;
-
-  ptr=&userLib[0];
-  ptr+=(uhdl*DIRENTRYSIZE);
-  
-  newpath.toCharArray(path,DIRENTRYSIZE);
-  strcpy(ptr,path);  
-
-  return (true);  
-}
-
 boolean setURD(int uhdl, String newpath){
   char* ptr = NULL;
   char path[DIRENTRYSIZE+1];
@@ -3943,27 +3904,6 @@ boolean setURD(int uhdl, String newpath){
   strcpy(ptr,path);
 
   return (true);  
-}
-
-String getCSD(int uhdl){
-  char * ptr = NULL;
-  if (uhdl>MAXUSERS) return "";
-  
-  ptr=&userCSD[0];
-  ptr+=(uhdl*DIRENTRYSIZE);
-
-  return String(ptr);
-}
-
-String getLib(int uhdl){
-  char * ptr = NULL;
-  if (uhdl>MAXUSERS) return "";
-  
-  ptr=&userLib[0];
-  ptr+=(uhdl*DIRENTRYSIZE);
-
- String result=String(ptr);
-  return result;
 }
 
 String getURD(int uhdl){
