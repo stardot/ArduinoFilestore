@@ -344,6 +344,7 @@ void fsLogin(byte txPort, String command, int bytesRX){
   userOpenFiles[usrHdl]=0;
   stataddress[usrHdl]=rxBuff[2];
   netaddress[usrHdl]=rxBuff[3];
+  setURD(usrHdl,profileURD);
   
   byte uCSDhdl=openFolder(usrHdl,profileURD);
   byte uLibhdl=openFolder(usrHdl,"/export/Library");
@@ -354,13 +355,10 @@ void fsLogin(byte txPort, String command, int bytesRX){
     //return;
   }
 
-  
   txBuff[6]=255; // new URD 
   txBuff[7]=uCSDhdl; // new CSD
   txBuff[8]=uLibhdl; // new Lib
-  
-
-  
+   
   // Write the user to the name buffer
   uPtr=userName;
   uPtr+=(usrHdl*22);
