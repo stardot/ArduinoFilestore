@@ -30,17 +30,17 @@ void fsOperation (int bytes){
       param1C=param1;
       param1C.toUpperCase();
    
-      if (param1C.startsWith("I AM")) fsLogin(replyPort,param1,bytes);
-      else if (param1C.startsWith("LOGON")) fsLogin(replyPort,param1,bytes);      
-      else if (param1C.startsWith("DIR")) fsChangeDir(replyPort,param1,false,bytes);
-      else if (param1C.startsWith("LIB")) fsChangeDir(replyPort,param1,true,bytes);
-      else if (param1C.startsWith("DELETE")) fsDelete(replyPort,true);
-      else if (param1C.startsWith("RENAME")) fsRename(replyPort,bytes);
-      else if (param1C.startsWith("NEWUSER")) fsNewUser(replyPort,bytes);
-      else if (param1C.startsWith("REMUSER")) fsRemUser(replyPort,bytes);
-      else if (param1C.startsWith("PRIV")) fsSetUserPriv(replyPort,bytes);
-      else if (param1C.startsWith("PASS")) fsChangePassword(replyPort,bytes);
-      else if (param1C.startsWith("SETURD")) fsSetUserRoot(replyPort,bytes);
+      if (param1C.startsWith("I AM ")) fsLogin(replyPort,param1,bytes);
+      else if (param1C.startsWith("LOGON ")) fsLogin(replyPort,param1,bytes);      
+      else if (param1C.startsWith("DIR ")) fsChangeDir(replyPort,param1,false,bytes);
+      else if (param1C.startsWith("LIB ")) fsChangeDir(replyPort,param1,true,bytes);
+      else if (param1C.startsWith("DELETE ")) fsDelete(replyPort,true);
+      else if (param1C.startsWith("RENAME ")) fsRename(replyPort,bytes);
+      else if (param1C.startsWith("NEWUSER ")) fsNewUser(replyPort,bytes);
+      else if (param1C.startsWith("REMUSER ")) fsRemUser(replyPort,bytes);
+      else if (param1C.startsWith("PRIV ")) fsSetUserPriv(replyPort,bytes);
+      else if (param1C.startsWith("PASS ")) fsChangePassword(replyPort,bytes);
+      else if (param1C.startsWith("SETURD ")) fsSetUserRoot(replyPort,bytes);
       // Unimplemented commands are:
       // ACCESS
       // INFO
@@ -244,15 +244,45 @@ void fsOperation (int bytes){
 void fsLogin(byte txPort, String command, int bytesRX){
   int usrHdl=-1;
   int ptr=0;
+  int paramPtr=14;
   char* uPtr = NULL;
   char userBuf[23];
   FatFile profileHdl;
+
+  if (getStringFromRX(13,1)!="") { paramPtr++; }// Check for space after *I AM, if not there then move pointer along for *LOGON
   
   sdSelect(); // Make sure SD card is selected on the SPI bus  
 
-  String user=getStringFromRX(14,21);
+  String param1="";
+  String param2="";
+  String param3="";
+  
+  param1=getStringFromRX(paramPtr,bytesRX); 
+  
+  if (bytesRX>paramPtr-1+param1.length()) {
+    paramPtr+=param1.length()+1;
+    param2=getStringFromRX(paramPtr,bytesRX-paramPtr); 
+  }
+  
+  if (bytesRX>paramPtr-1+param2.length()) {
+    paramPtr+=param2.length()+1;
+    param3=getStringFromRX(paramPtr,bytesRX-paramPtr); 
+  }
+  
+  String user="";
   String pass="";
-  if (bytesRX>13+user.length()) pass=getStringFromRX(15+user.length(),22); // Only look for a password if submitted - TODO: need to take into account optional station number
+
+  user=param1;
+  pass=param2;
+
+  int station=MYSTATION;
+
+  if (user==(String)station){
+    // If username is the station number then shuffle along one (BBC NFS sends the station, ANFS does not)
+    user=param2;
+    pass=param3;
+  } 
+ 
   if (pass=="\"\"") pass=""; // Fix blank password submitted
  
   user.toUpperCase();
