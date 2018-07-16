@@ -530,9 +530,18 @@ void fsRename(byte txPort, int bytesRx) {
   String fatPathN=convertToFATPath(newName, workingDir, txPort);
   Serial.print(fatPathN);
   
-  //TODO: Access control - seriously!
+  if (!hasUserAccess(usrHdl,fatPathO,false)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
-  //fsError(0xBD,"Insufficient Access",txPort);
+  if (!hasUserAccess(usrHdl,fatPathN,false)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access at Destination",txPort);
+    return; 
+  }  
+
   fatPathO.toCharArray(pathBuff1, DIRENTRYSIZE);
   fatPathN.toCharArray(pathBuff2, DIRENTRYSIZE);
 
@@ -1027,7 +1036,12 @@ void fsSave(int txPort){
   Serial.print(F(" "));
  
 
-  // TODO: Access control?  
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
+ 
 
   fatPath.toCharArray(pathBuff1, 128);
 
@@ -1178,7 +1192,11 @@ void fsLoad(int txPort,boolean loadAs){
  
 
   // Open the file
-  // TODO: Access control here!
+  if (!hasUserAccess(usrHdl,fatPath,true)){
+    // User does not have read access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
 
   fatPath.toCharArray(pathBuff1, 128);
@@ -1412,7 +1430,7 @@ void fsExamine(int txPort){
   String fatPath=convertToFATPath(pathName, workingDir, txPort);
   Serial.print(fatPath);
 
-  // TODO: Access control?
+  // No access control required, directories are always readable
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -1503,7 +1521,7 @@ void fsExamine(int txPort){
         bufpos++;
         
 
-        // File attributes - TODO
+        // File attributes
         txBuff[bufpos]=fileAttr;
         bufpos++;
         
@@ -1625,7 +1643,11 @@ void fsOpen(int txPort){
   Serial.print(F(" disk path "));
   Serial.print(fatPath);
 
-  // TODO: Access control?  
+  if (!hasUserAccess(usrHdl,fatPath,readOnly)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -2638,7 +2660,7 @@ void fsReadObjectInfo(byte txPort){
   Serial.print(F(")"));
 
   
-  // TODO: Access control?
+  // No access control required, it's always possible to read attributes
 
    fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -2877,7 +2899,11 @@ void fsSetObjectInfo(byte txPort){
   Serial.print(F(")"));
 
   
-  // TODO: Access control?
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
    fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -3012,9 +3038,18 @@ void fsDelete(byte txPort, boolean oscli) {
   String fatPath=convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
   
-  //TODO: Access control - seriously!
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }
 
-  //fsError(0xBD,"Insufficient Access",txPort);
+  if (isObjectLocked(fatPath)){
+    // Object locked against deletion
+    fsError(0xBD,"Object locked",txPort);
+    return;    
+  }
+  
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if(!sd.exists(pathBuff1)){
@@ -3300,9 +3335,12 @@ void fsCdir(byte txPort) {
   String fatPath=convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
   
-  //TODO: Access control - seriously!
+  if (!fatPath.startsWith(getURD(usrHdl),0)){
+    // User does not own parent directory
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
-  //fsError(0xBD,"Insufficient Access",txPort);
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if(sd.exists(pathBuff1)){
@@ -3414,8 +3452,12 @@ void fsCreateFile(int txPort){
   Serial.print(fatPath);
   Serial.print(F(")")); 
   
-  // TODO: Access control!
-  // TODO: Attribute and load/exec address mapping
+
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -4094,4 +4136,31 @@ boolean isSystemUser(int usrHdl){
   return(false);
 }
 
+boolean hasUserAccess(int usrHdl, String file, boolean readOnly){
+  if (isSystemUser(usrHdl)==true) return true; // System user, no point checking further.
+  file.toCharArray(pathBuff1, DIRENTRYSIZE);
+  int fileAttr=getAttributes(pathBuff1);
+  
+
+  if (file.startsWith(getURD(usrHdl),0)){
+    // User is file owner
+    if (readOnly && (fileAttr & 4) ) return true; // File has owner read
+    if ((!readOnly) && (fileAttr & 8) ) return true; // File has owner write   
+    if (fileAttr & 32 ) return true; // It's a directory
+  } else {
+    // Not file owner
+    if (readOnly && (fileAttr & 1) ) return true; // File has public read
+    if ((!readOnly) && (fileAttr & 2) ) return true; // File has public write    
+    if (readOnly && (fileAttr & 32) ) return true; // It's a directory
+  }
+  
+  return (false);  
+}
+
+boolean isObjectLocked(String file){
+  file.toCharArray(pathBuff1, DIRENTRYSIZE);
+  int fileAttr=getAttributes(pathBuff1);
+  if (fileAttr && (fileAttr & 16)) return true;
+  return false;
+}
 
