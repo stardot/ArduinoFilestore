@@ -32,8 +32,8 @@ void fsOperation (int bytes){
    
       if (param1C.startsWith("I AM ")) fsLogin(replyPort,param1,bytes);
       else if (param1C.startsWith("LOGON ")) fsLogin(replyPort,param1,bytes);      
-      else if (param1C.startsWith("DIR ")) fsChangeDir(replyPort,param1,false,bytes);
-      else if (param1C.startsWith("LIB ")) fsChangeDir(replyPort,param1,true,bytes);
+      else if (param1C.startsWith("DIR")) fsChangeDir(replyPort,param1,false,bytes);
+      else if (param1C.startsWith("LIB")) fsChangeDir(replyPort,param1,true,bytes);
       else if (param1C.startsWith("DELETE ")) fsDelete(replyPort,true);
       else if (param1C.startsWith("RENAME ")) fsRename(replyPort,bytes);
       else if (param1C.startsWith("NEWUSER ")) fsNewUser(replyPort,bytes);
@@ -432,6 +432,13 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   workingDir=getDirectoryPath(usrHdl,csd);
   
   String newDir=getStringFromRX(13,bytesRx-13);
+  String fatPath;
+  if (newDir=="") {
+    fatPath=getURD(usrHdl); // DIR without a parameter means goto URD
+  } else {
+    fatPath=convertToFATPath(newDir, workingDir, txPort);
+  }
+  
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" CSD: ");
@@ -439,7 +446,6 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   Serial.print(" Lib: ");
   Serial.print(lib);  
   if (library) Serial.print(" Requested library path: "); else Serial.print(" Requested csd path: "); 
-  String fatPath=convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
   
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
