@@ -3796,11 +3796,14 @@ byte getAttributes(const char* objectName){
         meta.close();
       } else {
         // No meta file (or error opening it)
-        attribute=15; //Default to owner read and write access
+        attribute=12; //Default to owner read and write access
       }
-    }
+    } 
   file.close();
-  } // return from open file. If file didn't open returning 0 is sensible
+  } else {
+      // File or directory failed to open, probably doesn't exist
+      attribute=12; //Default to owner read and write access
+  }
   return attribute;
 }
 
@@ -4139,7 +4142,6 @@ boolean hasUserAccess(int usrHdl, String file, boolean readOnly){
   if (isSystemUser(usrHdl)==true) return true; // System user, no point checking further.
   file.toCharArray(pathBuff1, DIRENTRYSIZE);
   int fileAttr=getAttributes(pathBuff1);
-  
 
   if (file.startsWith(getURD(usrHdl),0)){
     // User is file owner
