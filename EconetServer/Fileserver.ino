@@ -4034,9 +4034,8 @@ String getDirectoryPath(byte usrHdl,byte dirHdl){
   String workingDir;
   
   if (dirHdl==255) {
-    // URD requested
-    // TODO dunno yet
-    return (FSROOT);
+    // User root directory requested
+    return (getURD(usrHdl));
   }
 
   if (fHandleActive[dirHdl]){
