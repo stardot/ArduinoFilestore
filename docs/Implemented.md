@@ -52,7 +52,7 @@ Here is an overview of which NetFS operations are currently working
 |:heavy_check_mark: |27|	Create directory, specifying size| |
 | |28|	Set file server date and time| Probably not required, as fetched from NTP daily|
 |:heavy_check_mark: |29|	Create file| |
-|:heavy_check_mark: |30|	Read user free space| |
+|:heavy_check_mark: |30|	Read user free space| Actually just returns disk space, as quotas not implemented|
 | |31|	Set user free space| |
 |:heavy_check_mark: |32|	Read client UserId| |
 | |33|	Read current users' info (extended)| |
