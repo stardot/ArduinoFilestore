@@ -1492,13 +1492,16 @@ void fsExamine(int txPort){
     unsigned long loadAddress=getLoadAddressForObject(pathBuff2);
     byte fileAttr=getAttributes(pathBuff2);
     int fsDate=getEconetDate(&dirEntry);
+    String fcName=pathBuff4;
+    fcName.replace(".","/");
+    
 
     switch(format){
       case 0:
         // Machine readable format requested
   
         //Send name first
-        writeStringtoTX(pathBuff4, bufpos, 10);    //TODO: If root send $ 
+        writeStringtoTX(fcName, bufpos, 10);    //TODO: If root send $ 
         bufpos+=10;
 
         // Load and Execution addresses
@@ -1556,7 +1559,7 @@ void fsExamine(int txPort){
       bufpos++;
 
       //Now the name
-      writeStringtoTX(pathBuff4, bufpos, 10);     
+      writeStringtoTX(fcName, bufpos, 10);     
       bufpos+=10;
       break;
 
@@ -1564,7 +1567,7 @@ void fsExamine(int txPort){
       // 10 character filename format
 
       //Send name first
-      writeStringtoTX(pathBuff4, bufpos, 10);     
+      writeStringtoTX(fcName, bufpos, 10);     
       bufpos+=10;
 
       // 7 characters access attributes - padded out to 8 characters
