@@ -13,7 +13,7 @@ byte ip[]{172,16,128,170};
 byte dnsAddr[]{172,16,129,3};
 byte gateway[]{172,16,128,254};
 byte subnet[]{255,255,255,0};
-IPAddress timeServer(172,16,129,2);
+IPAddress timeServer(172,16,208,2);
 
 EthernetClient client;
 EthernetUDP Udp;
