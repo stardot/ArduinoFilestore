@@ -52,7 +52,7 @@ Here is an overview of which NetFS operations are currently working
 |:heavy_check_mark: |27|	Create directory, specifying size| |
 | |28|	Set file server date and time| Probably not required, as fetched from NTP daily|
 |:heavy_check_mark: |29|	Create file| |
-|:heavy_check_mark: |30|	Read user free space| |
+|:heavy_check_mark: |30|	Read user free space| Actually just returns disk space, as quotas not implemented|
 | |31|	Set user free space| |
 |:heavy_check_mark: |32|	Read client UserId| |
 | |33|	Read current users' info (extended)| |
@@ -63,9 +63,11 @@ Here is an overview of which NetFS operations are currently working
 
 # Implementation details
 
-Currently access attributes (owner / public and locked) are not checked by any routine, so every user can access any file.
-
-Directories should be correctly identified as Owner and Public based on the user root directory in their profile
+Directories should be correctly identified as Owner and Public based on the user root directory in their profile, and public /
+private attributes are enforced based on the complete path - not the usage of &. This is different to Acorn servers, in that
+your provate permissions are preserved if you traverse back to your URD from the server root.
 
 It's undefined how any existing files on the SD card will be handled if they break the NetFS naming rules. Also these rules
-are not checked in several places, so it is possible to create an illegal NetFS name with \*CDIR or \*RENAME
+are not checked in several places, so it is possible to create an illegal NetFS name with \*CDIR or \*RENAME, or copying a file
+to NetFS from another FS which has different rules. But they can be \*DELETED if it's not possible to get them into a format
+that is accessible.
