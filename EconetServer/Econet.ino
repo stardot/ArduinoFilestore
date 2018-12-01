@@ -10,7 +10,7 @@ void rxFrame(){
   // First byte should be address
   rxBuff[0]=readFIFO();
 
-  if (rxBuff[0] != MYSTATION && rxBuff[0] != 255 ) {
+  if (rxBuff[0] != config_Station.toInt() && rxBuff[0] != 255 ) {
       // If frame is not for me, or a broadcast, then bail out
       resetIRQ();
       return;
@@ -317,6 +317,7 @@ boolean txFrame(int bytes){
     writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
     delayMicroseconds(1);
     sr1=readSR1();
+//    if (millis()>timeOut){Serial.print("TX timeout waiting for TDRA, SR1="); printSR1(sr1); resetIRQ(); return(false);}
   }
 
   digitalWriteDirect(PIN_LED,1);
@@ -552,7 +553,7 @@ boolean checkAck(){
   // First byte should be address
   rxBuff[0]=readFIFO();
 
-  if (rxBuff[0] != MYSTATION) {
+  if (rxBuff[0] != config_Station.toInt()) {
       // If frame is not for me, then bail out
       resetIRQ();
       return(false);
@@ -595,7 +596,7 @@ void rxReset(){
 void listFS(){
   txBuff[0]=0xFF; 
   txBuff[1]=0xFF;
-  txBuff[2]=MYSTATION;
+  txBuff[2]=config_Station.toInt();
   txBuff[3]=0;
   txBuff[4]=0x80;
   txBuff[5]=0x99;
@@ -614,7 +615,7 @@ void listFS(){
 void bridgeProbe(){
   txBuff[0]=0xFF; 
   txBuff[1]=0xFF;
-  txBuff[2]=MYSTATION;
+  txBuff[2]=config_Station.toInt();
   txBuff[3]=0;
   txBuff[4]=0x82;
   txBuff[5]=0x9C;

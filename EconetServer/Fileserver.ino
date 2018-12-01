@@ -41,6 +41,8 @@ void fsOperation (int bytes){
       else if (param1C.startsWith("PRIV ")) fsSetUserPriv(replyPort,bytes);
       else if (param1C.startsWith("PASS ")) fsChangePassword(replyPort,bytes);
       else if (param1C.startsWith("SETURD ")) fsSetUserRoot(replyPort,bytes);
+      else if (param1C.startsWith("FSSHUTDOWN")) fsShutdown(replyPort,false);
+      else if (param1C.startsWith("FSREBOOT")) fsShutdown(replyPort,true);      
       // Unimplemented commands are:
       // ACCESS
       // INFO
@@ -275,7 +277,7 @@ void fsLogin(byte txPort, String command, int bytesRX){
   user=param1;
   pass=param2;
 
-  int station=MYSTATION;
+  int station=config_Station.toInt();
 
   if (user==(String)station){
     // If username is the station number then shuffle along one (BBC NFS sends the station, ANFS does not)
@@ -286,14 +288,15 @@ void fsLogin(byte txPort, String command, int bytesRX){
   if (pass=="\"\"") pass=""; // Fix blank password submitted
  
   user.toUpperCase();
-  String userProfile=PROFILEROOT;
-  userProfile=userProfile+"/";
-  userProfile=userProfile+user;
+  String userProfile;
+  userProfile=config_ProfileRoot+"/"+user;
   
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   Serial.print(F("User "));
   Serial.print(user);
+  Serial.print(F(" Profile "));
+  Serial.print(config_ProfileRoot);
 
   if(!sd.exists(pathBuff1)){
     fsError(0xBC,"User not known",txPort);
@@ -571,9 +574,9 @@ void fsRename(byte txPort, int bytesRx) {
   
   //Need to move the metadata too
 
-  fatPathO.replace(FSROOT,METAROOT);
+  fatPathO.replace(config_FSRoot,config_MetaRoot);
   fatPathO.toCharArray(pathBuff3, DIRENTRYSIZE);
-  fatPathN.replace(FSROOT,METAROOT);
+  fatPathN.replace(config_FSRoot,config_MetaRoot);
   fatPathN.toCharArray(pathBuff4, DIRENTRYSIZE);
 
   if(sd.exists(pathBuff3)){
@@ -622,7 +625,7 @@ void fsNewUser(byte txPort, int bytesRx){
     return;    
   }
   
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+newUser;
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -695,7 +698,7 @@ void fsRemUser(byte txPort, int bytesRx){
     return;    
   }
 
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+remUser;
   
@@ -758,7 +761,7 @@ void fsSetUserPriv(byte txPort, int bytesRx){
     return;    
   }
 
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+privUser;
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -828,7 +831,7 @@ void fsChangePassword(byte txPort, int bytesRx) {
   Serial.print(newPass);
   Serial.print("'"); 
 
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+userName;
   
@@ -916,14 +919,14 @@ void fsSetUserRoot(byte txPort, int bytesRx){
     return;    
   }
 
-  String fatPath=convertToFATPath(newURD, FSROOT, txPort);
+  String fatPath=convertToFATPath(newURD, config_FSRoot, txPort);
 
   Serial.print(" (path: "); 
   Serial.print(fatPath);
   Serial.print(") "); 
 
   dirUser.toUpperCase();
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+dirUser;
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -971,6 +974,66 @@ void fsSetUserRoot(byte txPort, int bytesRx){
    
 }
 
+void fsShutdown(byte txPort, bool reboot){
+
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  // Get user handle
+  int usrHdl=fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl==-1){
+    fsError(0xBF,F("Who are you?"),txPort);
+    return;
+  }
+
+  Serial.print(" User: "+(String)usrHdl+" requesting FS shutdown ");
+  if (reboot) Serial.print(" and restart ");
+
+  //Check they have system privs
+  if (!isSystemUser(usrHdl)){
+    fsError(0xBA,F("Insufficient privilege"),txPort);
+    return;
+  }
+
+  Serial.print("\nLogging off users ");
+
+  int ptr=0;
+  do {
+    if (stataddress[ptr]!=0){
+       Serial.print((String)ptr+" ");
+      fsLogoff(netaddress[ptr],stataddress[ptr]);        
+    }
+    ptr++;
+  } while (ptr<MAXUSERS);
+
+  String message;
+
+  if (reboot){
+     message="All users logged off, server rebooting\r";
+  } else {
+     message="All users logged off, server halted\r";
+  }
+
+  Serial.print("\n------------------------------------------------\n\n");
+    
+  fsError(0xFF,message,txPort); // Send shutdown successful error
+
+  Serial.print("\n\n");
+  
+  delay (5000); //Wait 5 seconds
+
+  //Self reset definitions
+  #define SYSRESETREQ    (1<<2)
+  #define VECTKEY        (0x05fa0000UL)
+  #define VECTKEY_MASK   (0x0000ffffUL)
+  #define AIRCR          (*(uint32_t*)0xe000ed0cUL) // fixed arch-defined address
+  #define REQUEST_EXTERNAL_RESET (AIRCR=(AIRCR&VECTKEY_MASK)|VECTKEY|SYSRESETREQ);
+
+  if (reboot) REQUEST_EXTERNAL_RESET; // Jump to hardware reset vector
+
+  // if still here, put CPU to sleep until manually reset
+  pmc_enable_sleepmode(0);
+
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function 1 - Save
 /////////////////////////////////////////////////////////////////////
@@ -1102,7 +1165,7 @@ void fsSave(int txPort){
   userOpenFiles[usrHdl]++;
 
   //Now create the meta entry
-  fatPath.replace(FSROOT,METAROOT);
+  fatPath.replace(config_FSRoot,config_MetaRoot);
   fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
   
   if (!file.open(pathBuff2,(O_RDWR | O_CREAT))){
@@ -1121,8 +1184,8 @@ void fsSave(int txPort){
     // Send an OK so station can start the bulk TX process
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00; // Command code 0
     txBuff[5]=0x00; // Result OK
     txBuff[6]=dataPort; 
@@ -1142,8 +1205,8 @@ void fsSave(int txPort){
       
       txBuff[0]=rxBuff[2]; 
       txBuff[1]=rxBuff[3];
-      txBuff[2]=MYSTATION;
-      txBuff[3]=MYNET;
+      txBuff[2]=config_Station.toInt();
+      txBuff[3]=config_Net.toInt();
       txBuff[4]=0x00; // Command code
       txBuff[5]=0x00; // result = OK
       txBuff[6]=15; // TODO: correct attributes (hardcoded to allow all access, not locked)
@@ -1311,8 +1374,8 @@ void fsLoad(int txPort,boolean loadAs){
   // Send an OK with file information so we can begin TXing the requested bytes
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
 
@@ -1373,8 +1436,8 @@ void fsLoad(int txPort,boolean loadAs){
   if (!fileError){
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00;
     txBuff[5]=0x00;
     
@@ -1460,8 +1523,8 @@ void fsExamine(int txPort){
   
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=0x00; // Populate with number of items returned later
@@ -1721,8 +1784,8 @@ void fsOpen(int txPort){
   
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=fHdl;
@@ -1789,8 +1852,8 @@ void fsClose(int txPort){
   // Still here, so.response
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   if (txWithHandshake(6,txPort,0x80)) Serial.println(F(".")); else Serial.println(F("!"));        
@@ -1844,8 +1907,8 @@ void fsGetByte(int txPort){
   // Still here, so.response
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=fileByte;
@@ -1924,8 +1987,8 @@ void fsPutByte(int txPort){
   // Still here, so.response
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   if (txWithHandshake(6,txPort,rxControlByte)) Serial.println(F(".")); else Serial.println(F("!"));        
@@ -1999,8 +2062,8 @@ void fsGetBytes(int txPort){
   // Send an OK so we can begin TXing the requested bytes
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   if (txWithHandshake(6,txPort,rxControlByte)) Serial.print(F("")); 
@@ -2034,8 +2097,8 @@ void fsGetBytes(int txPort){
   if (!fileError){
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00;
     txBuff[5]=0x00;
     if (eofReached) txBuff[6]=0x80; else txBuff[6]=0x00; 
@@ -2133,8 +2196,8 @@ void fsPutBytes(int txPort){
   // Send an OK so station can start the bulk TX process
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00; // Command code 0
   txBuff[5]=0x00; // Result OK
   txBuff[6]=dataPort; 
@@ -2205,8 +2268,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX){
     // Not all bytes received yet, send ack.
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00; // Any byte can be sent as the ack
     if (!txWithHandshake(5,ackPort,rxControlByte)) {
       Serial.print(F("- Ack Failed"));
@@ -2234,8 +2297,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX){
       
       txBuff[0]=rxBuff[2]; 
       txBuff[1]=rxBuff[3];
-      txBuff[2]=MYSTATION;
-      txBuff[3]=MYNET;
+      txBuff[2]=config_Station.toInt();
+      txBuff[3]=config_Net.toInt();
       txBuff[4]=0x00; // Command code
       txBuff[5]=0x00; // result = OK
       txBuff[6]=15; // TODO: correct attributes (hardcoded to allow all access, not locked)
@@ -2253,8 +2316,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX){
       // File is open for put bytes, send put bytes acknowledgement
       txBuff[0]=rxBuff[2]; 
       txBuff[1]=rxBuff[3];
-      txBuff[2]=MYSTATION;
-      txBuff[3]=MYNET;
+      txBuff[2]=config_Station.toInt();
+      txBuff[3]=config_Net.toInt();
       txBuff[4]=0x00; // Command code
       txBuff[5]=0x00; // result = OK
       txBuff[6]=0x00; // Undefined content 
@@ -2342,8 +2405,8 @@ void fsGetRandomAccessArgs(int txPort){
   // Still here, so.response and value
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=reqValue & 0xFF;
@@ -2426,8 +2489,8 @@ void fsSetRandomAccessArgs(int txPort){
   // Still here, so.response
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   if (txWithHandshake(6,txPort,0x80)) Serial.println(F(".")); else Serial.println(F("!"));        
@@ -2438,14 +2501,12 @@ void fsSetRandomAccessArgs(int txPort){
 /////////////////////////////////////////////////////////////////////
 
 void fsReadDiskInfo(byte txPort){
-  String myname=FSNAME;
-  
   if (rxBuff[9]!=0){
     // Non-First drive requested - send null response
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00;
     txBuff[5]=0x00;
     txBuff[6]=0x00; // No disks 
@@ -2458,14 +2519,14 @@ void fsReadDiskInfo(byte txPort){
     // First drive requested    
     txBuff[0]=rxBuff[2]; 
     txBuff[1]=rxBuff[3];
-    txBuff[2]=MYSTATION;
-    txBuff[3]=MYNET;
+    txBuff[2]=config_Station.toInt();
+    txBuff[3]=config_Net.toInt();
     txBuff[4]=0x00;
     txBuff[5]=0x00;
     txBuff[6]=0x01; // Number of disks in response
     txBuff[7]=0x00; // Begin disk 0
   
-    writeStringtoTX(myname, 8, 16);
+    writeStringtoTX(config_FSName, 8, 16);
   
     if (txWithHandshake(23,txPort,0x80)) Serial.println(F(".")); else Serial.println(F("!"));
   }
@@ -2500,8 +2561,8 @@ void fsReadCurrentUsers(int txPort){
 
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;  
   // txBuff[6]=0x00; // Entries returned - gets written later
@@ -2550,8 +2611,8 @@ void fsGetDateTime(int txPort){
   int ecohidate=((year()-1981) << 4) + month();
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=ecolodate;
@@ -2620,8 +2681,8 @@ void fsGetEndOfFile(int txPort){
   // Still here, so.response and value
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;
   txBuff[6]=result;
@@ -2945,7 +3006,7 @@ void fsSetObjectInfo(byte txPort){
 
   if (!isDir){
     //Now update the meta entry
-    fatPath.replace(FSROOT,METAROOT);
+    fatPath.replace(config_FSRoot,config_MetaRoot);
     fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
 
     if (!file.exists(pathBuff2)){
@@ -2965,7 +3026,7 @@ void fsSetObjectInfo(byte txPort){
   } else {
 
     //Now create the folder meta entry
-    fatPath.replace(FSROOT,METAROOT);
+    fatPath.replace(config_FSRoot,config_MetaRoot);
     fatPath=fatPath+"/$";
     fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
     
@@ -3094,7 +3155,7 @@ void fsDelete(byte txPort, boolean oscli) {
   if (!isDir){
     //Clean up metadata file if necessary
 
-    fatPath.replace(FSROOT,METAROOT);
+    fatPath.replace(config_FSRoot,config_MetaRoot);
     fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
   
     if(sd.exists(pathBuff2)){
@@ -3106,7 +3167,7 @@ void fsDelete(byte txPort, boolean oscli) {
   } else {
     // Remove the folder metadata
     
-    fatPath.replace(FSROOT,METAROOT);
+    fatPath.replace(config_FSRoot,config_MetaRoot);
     fatPath=fatPath+"/$";
     fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
   
@@ -3151,8 +3212,7 @@ void fsReadUserEnv(byte txPort){
   txBuff[5]=0; // Is successful
   txBuff[6]=16; //length of disk name
 
-  String diskName=FSNAME;
-  writeStringtoTX(diskName, 7, 16); // diskname
+  writeStringtoTX(config_FSName, 7, 16); // diskname
 
   String fcPath=convertToFilecorePath(csdPath);
   if (fcPath.length()>2) {
@@ -3205,7 +3265,7 @@ void fsSetBootOpts(byte txPort){
   }
 
   String user=getUsername(usrHdl);
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+user;  
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -3272,8 +3332,8 @@ void fsBye(byte txPort){
 void fsInfo(int txPort){
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   
   txBuff[4]=0x00;
   txBuff[5]=0x00;
@@ -3494,7 +3554,7 @@ void fsCreateFile(int txPort){
   file.close();
   
   //Now create the meta entry
-  fatPath.replace(FSROOT,METAROOT);
+  fatPath.replace(config_FSRoot,config_MetaRoot);
   fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
   
   if (!file.open(pathBuff2,(O_RDWR | O_CREAT))){
@@ -3576,8 +3636,8 @@ void fsReadClientID(int txPort){
 
   txBuff[0]=rxBuff[2]; 
   txBuff[1]=rxBuff[3];
-  txBuff[2]=MYSTATION;
-  txBuff[3]=MYNET;
+  txBuff[2]=config_Station.toInt();
+  txBuff[3]=config_Net.toInt();
   txBuff[4]=0x00;
   txBuff[5]=0x00;  
 
@@ -3639,16 +3699,16 @@ void fsCloseUserFiles(int usrHdl){
 }
 
 String convertToFATPath(String pathName, String basedir, byte errorPort){
-  String serverRoot=FSROOT;
+  String serverRoot=config_FSRoot;
   String result=pathName;
   if (pathName.startsWith(":")){
     // Disk name specified, check it's correct then remove it
     String diskName=pathName.substring(1,pathName.indexOf("."));
-    String fsdiskName=FSNAME;
+    String fsName=config_FSName;
     diskName.toUpperCase();
-    fsdiskName.toUpperCase();
+    fsName.toUpperCase();
 
-    if (diskName != fsdiskName){
+    if (diskName != fsName){
       fsError(0x54,F("disk not a fileserver disk"),errorPort);
       return("");
     } else {
@@ -3729,7 +3789,7 @@ boolean createMetaFile(String path){
   unsigned long execAddress=getExecAddressForObject(pathBuff1);
   byte attr=getAttributes(pathBuff1);
 
-  path.replace(FSROOT,METAROOT);
+  path.replace(config_FSRoot,config_MetaRoot);
   path.toCharArray(pathBuff2, DIRENTRYSIZE);
   
   if (isDir){
@@ -3781,7 +3841,7 @@ byte getAttributes(const char* objectName){
     if(file.isDir()){
      // Object is a folder
       String metaName=objectName+(String)"/$";
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
       
       if(meta.open(pathBuff3, O_READ)) {
@@ -3796,7 +3856,7 @@ byte getAttributes(const char* objectName){
     } else {
       //Object is a file - look for metadata file
       String metaName=objectName;
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
       
       if(meta.open(pathBuff3, O_READ)) {
@@ -3826,7 +3886,7 @@ unsigned long getExecAddressForObject(const char* objectName){
   if(file.open(objectName, O_READ)) {
     if(file.isDir()){
       String metaName=objectName+(String)"/$";
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
 
       if(meta.open(pathBuff3, O_READ)) {
@@ -3855,7 +3915,7 @@ unsigned long getExecAddressForObject(const char* objectName){
     } else {
       //Object is a file - look for metadata file
       String metaName=objectName;
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
 
       if(meta.open(pathBuff3, O_READ)) {
@@ -3881,7 +3941,7 @@ unsigned long getLoadAddressForObject(const char* objectName){
     if(file.isDir()){
       // Open metadata if available
       String metaName=objectName+(String)"/$";
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
    
       if(meta.open(pathBuff3, O_READ)) {
@@ -3915,7 +3975,7 @@ unsigned long getLoadAddressForObject(const char* objectName){
     } else {
       //Object is a file - look for metadata file
       String metaName=objectName;
-      metaName.replace(FSROOT,METAROOT);
+      metaName.replace(config_FSRoot,config_MetaRoot);
       metaName.toCharArray(pathBuff3, DIRENTRYSIZE);
       
       if(meta.open(pathBuff3, O_READ)) {
@@ -3932,7 +3992,7 @@ unsigned long getLoadAddressForObject(const char* objectName){
 String convertToFilecorePath(String pathName){
   String result=pathName;
 
-  result.replace("FSROOT",""); //Remove the prefix TODO: Probably should be smarter about this
+  result.replace("config_FSRoot",""); //Remove the prefix TODO: Probably should be smarter about this
  
   if (pathName=="/") return "$"; // If just the root left, no more work to do
   
@@ -4054,7 +4114,7 @@ String getDirectoryPath(byte usrHdl,byte dirHdl){
     workingDir=getFilePath(dirHdl);
   } else {
     // Inactive filehandle, return to root
-    workingDir=FSROOT;
+    workingDir=config_FSRoot;
   }
 
 
@@ -4129,7 +4189,7 @@ boolean isSystemUser(int usrHdl){
   FatFile profileHdl;
   
   String user=getUsername(usrHdl);
-  String userProfile=PROFILEROOT;
+  String userProfile=config_ProfileRoot;
   userProfile=userProfile+"/";
   userProfile=userProfile+user;  
   userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -4174,3 +4234,42 @@ boolean isObjectLocked(String file){
   return false;
 }
 
+String readConfigValue(String key){
+  FatFile handle;
+  String configFile=config_confRoot+"/"+key;
+  Serial.print("Reading from "+configFile+",");  
+  configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
+  if (handle.open(pathBuff1, (O_READ))){
+    int bytesRead=handle.read(&workBuff,255);
+    handle.close();
+
+    if (bytesRead==0) return("");
+
+    String value=String((char *)&workBuff);
+
+    Serial.println(" got value '"+value+"' ("+(String)bytesRead+" bytes)");
+    return(value); 
+    
+  } else {
+    Serial.println(" file failed to open");
+    return("");
+  }    
+}
+
+void writeConfigValue(String key,String value){
+  FatFile handle;
+  int writeBytes=value.length()+1;
+  String configFile=config_confRoot + "/" + key;
+  configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  if (handle.open(pathBuff1, (O_RDWR | O_CREAT))){
+    Serial.print("Writing "+value+" to "+configFile+ ", "+(String)writeBytes+" bytes..");
+    value.toCharArray(confBuff,writeBytes);
+    handle.write(&confBuff,writeBytes);
+    handle.close();
+    Serial.println(" done");
+  } else {
+    Serial.println("Failed to open / create config value "+configFile);
+  }  
+}
+   
