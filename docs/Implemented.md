@@ -65,7 +65,7 @@ Here is an overview of which NetFS operations are currently working
 
 Directories should be correctly identified as Owner and Public based on the user root directory in their profile, and public /
 private attributes are enforced based on the complete path - not the usage of &. This is different to Acorn servers, in that
-your provate permissions are preserved if you traverse back to your URD from the server root.
+your private permissions are preserved if you traverse back to your URD from the server root.
 
 It's undefined how any existing files on the SD card will be handled if they break the NetFS naming rules. Also these rules
 are not checked in several places, so it is possible to create an illegal NetFS name with \*CDIR or \*RENAME, or copying a file
