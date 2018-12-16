@@ -4158,21 +4158,22 @@ boolean isSystemUser(int usrHdl) {
 String readConfigValue(String key) {
   FatFile handle;
   String configFile = config_confRoot + "/" + key;
-  Serial.print("Reading from " + configFile + ",");
+  //Serial.print("Reading from " + configFile + ",");
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
   if (handle.open(pathBuff1, (O_READ))) {
     int bytesRead = handle.read(&workBuff, 255);
     handle.close();
 
     if (bytesRead == 0) return ("");
+    workBuff[bytesRead]=0; // Mark the end of string
 
     String value = String((char *)&workBuff);
 
-    Serial.println(" got value '" + value + "' (" + (String)bytesRead + " bytes)");
+    //Serial.println(" got value '" + value + "' (" + (String)bytesRead + " bytes)");
     return (value);
 
   } else {
-    Serial.println(" file failed to open");
+    //Serial.println(" file failed to open");
     return ("");
   }
 }
@@ -4180,7 +4181,7 @@ String readConfigValue(String key) {
 byte readConfigValueByte(String key) {
   FatFile handle;
   String configFile = config_confRoot + "/" + key;
-  Serial.print("Reading from " + configFile + ",");
+  //Serial.print("Reading from " + configFile + ",");
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
   
   if (handle.open(pathBuff1, (O_READ))) {
@@ -4188,17 +4189,17 @@ byte readConfigValueByte(String key) {
     handle.close();
 
     if (bytesRead<1){
-      Serial.println(" file read failed");
+      Serial.println("Reading from " + configFile +" - file read failed");
       return (0);
     }
 
     byte value = workBuff[0];
-    Serial.println(" got byte value " + String(value));
+    //Serial.println(" got byte value " + String(value));
     return (value);
 
   } else {
     Serial.print("! ");
-    Serial.println(" file failed to open");
+    // Serial.println(" "Reading from " + configFile + - file failed to open");
     return (0);
   }
 }
@@ -4211,7 +4212,7 @@ void writeConfigValue(String key, String value) {
   value.toCharArray(confBuff,255);
 
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-    Serial.print("Writing " + value + " to " + configFile);
+//    Serial.print("Writing " + value + " to " + configFile);
     handle.write(&confBuff,value.length());
     handle.close();
     Serial.println(" done");
@@ -4226,7 +4227,7 @@ void writeConfigValueByte(String key, byte value) {
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-    Serial.print("Writing byte " + String(value) + " to " + configFile );
+//    Serial.print("Writing byte " + String(value) + " to " + configFile );
     handle.write(value);
     handle.close();
     Serial.println(" done");

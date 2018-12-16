@@ -16,21 +16,12 @@ byte config_Station=170;
 String config_FSName="Arduino170";
 byte config_Net=0; // TODO: Not strictly speaking config, Needs a bridge discovery to fix this later on
 String config_etherMAC="00:00:00:00:00:00";
-String config_IP="000.000.000.000";
+String config_IP="000.000.000.000"; // Use DHCP
 String config_Netmask="000.000.000.000";
 String config_DNS="000.000.000.000";
 String config_Gateway="000.000.000.000";
-String config_NTPserver="000.000.000.000";
-
-// Base MAC address for 
-// 00:00:A4 Allocated to Acorn
-byte mac[] = {0x00, 0x00, 0xA4, 0x00, 0x00, 0x01};
-
-IPAddress ip(172,16,128,170);
-IPAddress dnsAddr(172,16,208,3);
-IPAddress gateway(172,16,128,254);
-IPAddress subnet(255,255,255,0);
-IPAddress timeServer(172,16,208,2);
+String config_NTPserver="000.000.000.000"; // Not defined
+IPAddress timeServer;
 
 EthernetClient client;
 EthernetUDP Udp;
@@ -287,35 +278,99 @@ void setup() {
     writeConfigValue("FSName",config_FSName);
   }   
 
-  Serial.println("Config load completed");
-
-  // start the Ethernet connection:
-  etherSelect();
-  Ethernet.begin(mac,ip,dnsAddr,gateway,subnet);
+  byte mac[] = {0, 0, 0, 0, 0, 0};
+  config_etherMAC=readConfigValue("MAC");
+  config_etherMAC.toCharArray(confBuff,18);  
+  sscanf(confBuff, "%x:%x:%x:%x:%x:%x", mac, mac + 1, mac + 2, mac + 3, mac + 4, mac + 5);
   
-  // Print local IP address:
+  if (mac[0]+mac[1]+mac[2]+mac[3]+mac[4]+mac[5] == 0) {
+    Serial.println("Invalid ethernet MAC address configured, "); 
+    mac[2] = 0xa4; // 00:00:A4 = Acorn MAC address allocation
+    mac[5] = config_Station;
+  } 
+  Serial.println ("Using ethernet MAC address "+String(mac[0],HEX)+":"+String(mac[1],HEX)+":"+String(mac[2],HEX)+":"+String(mac[3],HEX)+":"+String(mac[4],HEX)+":"+String(mac[5],HEX));
+
+  byte ip[] = {0, 0, 0, 0};
+  config_IP=readConfigValue("IP");
+  config_IP.toCharArray(confBuff,16);  
+  sscanf(confBuff, "%u.%u.%u.%u", ip, ip + 1, ip + 2, ip + 3);
+  
+  if (ip[0]+ip[1]+ip[2]+ip[3] == 0) {
+    Serial.println("Invalid IP address configured, using DHCP to get IP..."); 
+    etherSelect();
+    Ethernet.begin(mac); 
+  }  else {
+
+    byte mask[] = {0, 0, 0, 0};
+    config_Netmask=readConfigValue("Netmask");
+    config_Netmask.toCharArray(confBuff,16);  
+    sscanf(confBuff, "%u.%u.%u.%u", mask, mask + 1, mask + 2, mask + 3);
+  
+    if (mask[0]+mask[1]+mask[2]+mask[3] == 0) {
+       Serial.println("Netmask not set, using 255.255.255.0");    
+       mask[0]=255;
+       mask[1]=255;
+       mask[2]=255;
+    }
+ 
+    byte dns[] = {0, 0, 0, 0};
+    config_DNS=readConfigValue("DNS");
+    config_DNS.toCharArray(confBuff,16);  
+    sscanf(confBuff, "%u.%u.%u.%u", dns, dns + 1, dns + 2, dns + 3);
+  
+    if (dns[0]+dns[1]+dns[2]+dns[3] == 0) {
+       Serial.println("DNS not set, using 8.8.8.8");    
+       dns[0]=8;
+       dns[1]=8;
+       dns[2]=8;
+       dns[3]=8;
+    }
+
+    byte gateway[] = {0, 0, 0, 0};
+    config_Gateway=readConfigValue("Gateway");
+    config_Gateway.toCharArray(confBuff,16);  
+    sscanf(confBuff, "%u.%u.%u.%u", gateway, gateway + 1, gateway + 2, gateway + 3);
+      
+    etherSelect();
+    Ethernet.begin(mac,ip,dns,gateway,mask); 
+  }    
+
   Serial.print("Ethernet config complete - IP address: ");
-  Serial.print(Ethernet.localIP());
+  Serial.println(Ethernet.localIP());
+ 
+  config_NTPserver=readConfigValue("NTP");
+  byte ntpserver[] = {0, 0, 0, 0}; 
+  config_NTPserver.toCharArray(confBuff,16);  
+  sscanf(confBuff, "%u.%u.%u.%u", ntpserver, ntpserver + 1, ntpserver + 2, ntpserver + 3);
+  
+  if (ntpserver[0]+ntpserver[1]+ntpserver[2]+ntpserver[3] == 0) {
+    Serial.print("NTP server not configured, skipping clock sync");    
+  } else {
 
-  Serial.println("");
+    timeServer[0]=ntpserver[0];
+    timeServer[1]=ntpserver[1];
+    timeServer[2]=ntpserver[2];
+    timeServer[3]=ntpserver[3];
+        
+    Udp.begin(localUDPPort);
+    Serial.println("Waiting for NTP time sync from "+String(ntpserver[0])+"."+String(ntpserver[1])+"."+String(+ntpserver[2])+"."+String(+ntpserver[3])+"...");
+  
+    int attempt=1;
+    while (year()==1970 && attempt<4){
+      setSyncProvider(getNtpTime);
+      attempt++;
+    }
+    if (year()==1970) Serial.print(" No reply!");
+  
+    setSyncInterval(86400); // Once a day
 
-  Udp.begin(localUDPPort);
-  Serial.println("Waiting for NTP time sync...");
-
-  int attempt=1;
-  while (year()==1970 && attempt<4){
-    setSyncProvider(getNtpTime);
-    attempt++;
+    printTime();
+    Serial.print(" ");
+    printDate();
+    Serial.println("");
   }
-  if (year()==1970) Serial.print(" No reply!");
-
-  setSyncInterval(86400); // Once a day
-  
-  printTime();
-  Serial.print(" ");
-  printDate();
-  Serial.println("");
-  
+  Serial.println("Config load completed");
+   
   // Attaching SD filesystem callback for RTC
   SdFile::dateTimeCallback(dateTimeCB);
   
