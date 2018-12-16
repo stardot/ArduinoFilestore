@@ -6,30 +6,26 @@
 #include <time.h>
 #include <TimeLib.h>
 
-
-// Global Configration values
+// Global Configration value defaults
 String config_confRoot="/config";
 // These will be read from config folder specified above, defaults defined later if not present
-String config_FSRoot=""; 
-String config_MetaRoot="";
-String config_ProfileRoot="";
-String config_Station="";
-String config_FSName="";
-String config_Net="0"; // TODO: Needs a bridge discovery to fix this
-String config_IP="";
-String config_Netmask="";
-String config_DNS="";
-String config_Gateway="";
-String config_NTPserver="";
+String config_FSRoot="/export"; 
+String config_MetaRoot="/meta";
+String config_ProfileRoot="/users";
+byte config_Station=170;
+String config_FSName="Arduino170";
+byte config_Net=0; // TODO: Not strictly speaking config, Needs a bridge discovery to fix this later on
+String config_etherMAC="00:00:00:00:00:00";
+String config_IP="000.000.000.000";
+String config_Netmask="000.000.000.000";
+String config_DNS="000.000.000.000";
+String config_Gateway="000.000.000.000";
+String config_NTPserver="000.000.000.000";
 
 // Base MAC address for 
 // 00:00:A4 Allocated to Acorn
 byte mac[] = {0x00, 0x00, 0xA4, 0x00, 0x00, 0x01};
 
-//byte ip[]{172,16,128,170};
-//byte dnsAddr[]{172,16,208,3};
-//byte gateway[]{172,16,128,254};
-//byte subnet[]{255,255,255,0};
 IPAddress ip(172,16,128,170);
 IPAddress dnsAddr(172,16,208,3);
 IPAddress gateway(172,16,128,254);
@@ -39,6 +35,7 @@ IPAddress timeServer(172,16,208,2);
 EthernetClient client;
 EthernetUDP Udp;
 unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
+
 
 //Profile structure
 #define PROFILE_PRIV 0
@@ -85,6 +82,7 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define SD_SPI_PIN 4
 #define ETHER_SPI_PIN 10
 #define SPI_SPEED SD_SCK_MHZ(24) // TODO: Need to fine tune this
+
 
 byte rxBuff[BUFFSIZE];
 byte txBuff[BUFFSIZE];
@@ -212,25 +210,20 @@ void setup() {
 //sd.remove("/config/FSName");
 //sd.rmdir("/profile");
 
-Serial.println("SD card initialisation completed");
-  
   // Load configuration from card, or apply default values if missing
   config_FSRoot=readConfigValue("FSRoot");
   if (config_FSRoot.length()==0) {
-    config_FSRoot="/export";
     writeConfigValue("FSRoot",config_FSRoot);
   }
 
   
   config_MetaRoot=readConfigValue("MetaRoot");
   if (config_MetaRoot.length()==0) {
-    config_MetaRoot="/meta";
     writeConfigValue("MetaRoot",config_MetaRoot);
   }
 
   config_ProfileRoot=readConfigValue("ProfileRoot");
   if (config_ProfileRoot.length()==0) {
-    config_ProfileRoot="/users";
     writeConfigValue("ProfileRoot",config_ProfileRoot);
   }   
   config_FSRoot.toCharArray(pathBuff1, 255);
@@ -278,18 +271,21 @@ Serial.println("SD card initialisation completed");
     else Serial.println("FS profile folder not present, and failed to mkdir "+config_ProfileRoot);  
   }
 
-  config_Station=readConfigValue("Station");
-  if (config_Station.toInt() < 2 || config_Station.toInt() > 254) {
-    config_Station="169";
-    Serial.println("Station number invalid, using "+config_Station+" instead");
-    writeConfigValue("Station",config_Station);
+  byte config_Station_Temp=readConfigValueByte("Station");
+  if (config_Station_Temp < 2 || config_Station_Temp > 254) {
+    Serial.println("Station number invalid, using "+String(config_Station)+" instead");
+    writeConfigValueByte("Station",config_Station);
+  } else {
+    config_Station=config_Station_Temp;
   }
+
+  Serial.println("Station is "+String(config_Net)+"."+String(config_Station));
 
   config_FSName=readConfigValue("FSName");
   if (config_FSName.length()==0 || config_FSName.length()>16) {
-    config_FSName="Arduino"+config_Station;
+    config_FSName="Arduino"+String(config_Station);
     writeConfigValue("FSName",config_FSName);
-  } 
+  }   
 
   Serial.println("Config load completed");
 
@@ -315,7 +311,6 @@ Serial.println("SD card initialisation completed");
 
   setSyncInterval(86400); // Once a day
   
-  Serial.print("Fileserver time is now ");
   printTime();
   Serial.print(" ");
   printDate();
@@ -325,9 +320,9 @@ Serial.println("SD card initialisation completed");
   SdFile::dateTimeCallback(dateTimeCB);
   
   // Initialise the Econet interface
- Serial.print("Initialising Econet controller....");
+  Serial.print("Initialising Econet controller....");
   initADLC();
- Serial.println(" done.");
+  Serial.println(" done.");
   
   int ptr=0;
 
@@ -348,6 +343,10 @@ void loop() {
   boolean ledStatus=false, inFrame=false;
   int bufPtr=0, frameAddr=0;
   String lcdTime;
+
+  // TODO: Bridge discovery, and set net address
+  busWriteMode();
+  listFS();
   busReadMode();
 
   Serial.println("\n-------------------------------\nEntering main loop");
@@ -357,9 +356,7 @@ void loop() {
     if (!digitalReadDirect(PIN_IRQ)){
       //There is an IRQ to service
       statReg1=readSR1();
-
-      // printSR1(statReg1);
-
+ 
       if (statReg1 & 2){
         // SR2 needs servicing
         statReg2=readSR2();
@@ -378,13 +375,9 @@ void loop() {
         //Something else in SR1 needs servicing        
         if (statReg1 & 1) { readFIFO(); }; // Not expecting data, so just read and ignore it!
         resetIRQ(); //Reset IRQ as not expecting anything!
-        // Serial.println("Unexpected data received");
 
       } // end of SR2 servicing
     } // end of IRQ to service 
   } // end of event loop  
 } // Program loop
-
-
- 
 
