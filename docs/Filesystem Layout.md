@@ -43,4 +43,4 @@ The default name of the folder is profile, however this can be changed in the se
 ## config folder
 The statup configuration of the server is contained in a number of key / value pairs. Each configuration key has a file in this folder named after the key, which contains its value. The format of each file is undefined, and it's up the the server to parse the content correctly.
 
-The folder name is hard coded as config, and requires a copde change to modify.
+The folder name is hard coded as config, and requires a code change to modify.
