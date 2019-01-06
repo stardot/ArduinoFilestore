@@ -98,6 +98,7 @@ byte userCSDhdl[MAXUSERS];
 byte userLibhdl[MAXUSERS];
 int userOpenFiles[MAXUSERS];
 char userName[MAXUSERS*22]; // two level username of 10 chars, plus seperator, plus string termination
+byte userPriv[MAXUSERS];
  
 // Reserve space for filesystem tables
 SdFat sd; // Card file system object.
@@ -436,4 +437,3 @@ void loop() {
     } // end of IRQ to service 
   } // end of event loop  
 } // Program loop
-

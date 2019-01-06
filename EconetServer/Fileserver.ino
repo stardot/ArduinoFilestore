@@ -284,13 +284,14 @@ void fsLogin(byte txPort, String command, int bytesRX) {
     return;
   }
 
+  byte priv = workBuff[PROFILE_PRIV];
   byte bootOpts = workBuff[PROFILE_OPTS];
   byte enabled = workBuff[PROFILE_ENABLED];
   String profilePass = String((char *)&workBuff[PROFILE_PASSWORD]);
   String profileURD = String((char *)&workBuff[PROFILE_URD]);
-
+  profileHdl.close();
+  
   if (!enabled) {
-    profileHdl.close();
     fsError(0xBD, "User account disabled", txPort);
     return;
   }
@@ -305,7 +306,6 @@ void fsLogin(byte txPort, String command, int bytesRX) {
   Serial.print(F("'  "));
 
   if (!pass.equals(profilePass)) {
-    profileHdl.close();
     fsError(0xBB, "Incorrect password", txPort);
     return;
   }
@@ -341,10 +341,11 @@ void fsLogin(byte txPort, String command, int bytesRX) {
   };
 
 
-  // Record station address, and configure directories
+  // Record station address, privilege and configure directories
   userOpenFiles[usrHdl] = 0;
   stataddress[usrHdl] = rxBuff[2];
   netaddress[usrHdl] = rxBuff[3];
+  userPriv[usrHdl]= priv;
 
   byte uCSDhdl = openFolder(usrHdl, profileURD);
   byte uLibhdl = openFolder(usrHdl, "/export/Library");
@@ -758,6 +759,12 @@ void fsChangePassword(byte txPort, int bytesRx) {
   int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
   if (usrHdl == -1) {
     fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  // Stop Fixed and Locked users from changing their password
+  if (userPriv[usrHdl]<0x41) {
+    fsError(0xBA, F("Insufficient privilege"), txPort);
     return;
   }
 
@@ -3219,6 +3226,12 @@ void fsSetBootOpts(byte txPort) {
     return;
   }
 
+  // Stop Fixed and Locked users from changing their boot options
+  if (userPriv[usrHdl]<0x41) {
+    fsError(0xBA, F("Insufficient privilege"), txPort);
+    return;
+  }
+
   String user = getUsername(usrHdl);
   String userProfile = config_ProfileRoot;
   userProfile = userProfile + "/";
@@ -4132,26 +4145,7 @@ String getFilePath(int fHdl) {
 }
 
 boolean isSystemUser(int usrHdl) {
-  sdSelect();
-  FatFile profileHdl;
-
-  String user = getUsername(usrHdl);
-  String userProfile = config_ProfileRoot;
-  userProfile = userProfile + "/";
-  userProfile = userProfile + user;
-  userProfile.toCharArray(pathBuff1, DIRENTRYSIZE);
-
-  if (profileHdl.open(pathBuff1, O_READ)) {
-    int priv = profileHdl.read();
-    if (priv == 255) {
-      // User priv is system
-      profileHdl.close();
-      return (true);
-    }
-    // User priv is not S - but file opened OK
-    profileHdl.close();
-  }
-  return (false);
+    if (userPriv[usrHdl] == 255) return (true); else return (false);
 }
 
 String readConfigValue(String key) {
