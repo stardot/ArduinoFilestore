@@ -346,6 +346,7 @@ void fsLogin(byte txPort, String command, int bytesRX) {
   stataddress[usrHdl] = rxBuff[2];
   netaddress[usrHdl] = rxBuff[3];
   userPriv[usrHdl]= priv;
+  setURD(usrHdl,profileURD);
 
   byte uCSDhdl = openFolder(usrHdl, profileURD);
   byte uLibhdl = openFolder(usrHdl, "/export/Library");
@@ -504,9 +505,18 @@ void fsRename(byte txPort, int bytesRx) {
   String fatPathN = convertToFATPath(newName, workingDir, txPort);
   Serial.print(fatPathN);
 
-  //TODO: Access control - seriously!
+  if (!hasUserAccess(usrHdl,fatPathO,false)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
-  //fsError(0xBD,"Insufficient Access",txPort);
+  if (!hasUserAccess(usrHdl,fatPathN,false)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access at Destination",txPort);
+    return; 
+  }  
+
   fatPathO.toCharArray(pathBuff1, DIRENTRYSIZE);
   fatPathN.toCharArray(pathBuff2, DIRENTRYSIZE);
 
@@ -1065,7 +1075,11 @@ void fsSave(int txPort) {
   Serial.print(F(" "));
 
 
-  // TODO: Access control?
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   fatPath.toCharArray(pathBuff1, 128);
 
@@ -1158,7 +1172,7 @@ void fsSave(int txPort) {
     // Send final ack and close off the filehandles.
     dir_t dirEntry;
     fHandle[fHdl].dirEntry(&dirEntry);
-    int fsDate = getEcoconfig_NetDate(&dirEntry);
+    int fsDate = getEconetDate(&dirEntry);
 
     txBuff[0] = rxBuff[2];
     txBuff[1] = rxBuff[3];
@@ -1313,7 +1327,7 @@ void fsLoad(int txPort, boolean loadAs) {
   unsigned long execAddress = getExecAddressForObject(pathBuff1);
   unsigned long loadAddress = getLoadAddressForObject(pathBuff1);
   byte fileAttr = getAttributes(pathBuff1);
-  int fsDate = getEcoconfig_NetDate(&dirEntry);
+  int fsDate = getEconetDate(&dirEntry);
 
   Serial.print(F(" load addr "));
   Serial.print(loadAddress, HEX);
@@ -1452,7 +1466,7 @@ void fsExamine(int txPort) {
   String fatPath = convertToFATPath(pathName, workingDir, txPort);
   Serial.print(fatPath);
 
-  // TODO: Access control?
+  // No access control required, directories are always readable
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -1513,14 +1527,16 @@ void fsExamine(int txPort) {
     unsigned long execAddress = getExecAddressForObject(pathBuff2);
     unsigned long loadAddress = getLoadAddressForObject(pathBuff2);
     byte fileAttr = getAttributes(pathBuff2);
-    int fsDate = getEcoconfig_NetDate(&dirEntry);
-
+    int fsDate = getEconetDate(&dirEntry);
+    String fcName=pathBuff4;
+    fcName.replace(".","/");
+    
     switch (format) {
       case 0:
         // Machine readable format requested
 
         //Send name first
-        writeStringtoTX(pathBuff4, bufpos, 10);    //TODO: If root send $
+        writeStringtoTX(fcName, bufpos, 10);    //TODO: If root send $
         bufpos += 10;
 
         // Load and Execution addresses
@@ -1543,11 +1559,11 @@ void fsExamine(int txPort) {
         bufpos++;
 
 
-        // File attributes - TODO
+        // File attributes
         txBuff[bufpos] = fileAttr;
         bufpos++;
 
-        //config_NetFS File date
+        //File date
         txBuff[bufpos] = fsDate;
         bufpos++;
         txBuff[bufpos] = fsDate >> 8;
@@ -1578,7 +1594,7 @@ void fsExamine(int txPort) {
         bufpos++;
 
         //Now the name
-        writeStringtoTX(pathBuff4, bufpos, 10);
+        writeStringtoTX(fcName, bufpos, 10);
         bufpos += 10;
         break;
 
@@ -1586,7 +1602,7 @@ void fsExamine(int txPort) {
         // 10 character filename format
 
         //Send name first
-        writeStringtoTX(pathBuff4, bufpos, 10);
+        writeStringtoTX(fcName, bufpos, 10);
         bufpos += 10;
 
         // 7 characters access attributes - padded out to 8 characters
@@ -1683,7 +1699,11 @@ void fsOpen(int txPort) {
   Serial.print(F(" disk path "));
   Serial.print(fatPath);
 
-  // TODO: Access control?
+  if (!hasUserAccess(usrHdl,fatPath,readOnly)){
+    // User does not have access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -2259,7 +2279,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
 
       dir_t dirEntry;
       fHandle[fileHandle].dirEntry(&dirEntry);
-      int fsDate = getEcoconfig_NetDate(&dirEntry);
+      int fsDate = getEconetDate(&dirEntry);
 
       txBuff[0] = rxBuff[2];
       txBuff[1] = rxBuff[3];
@@ -2697,7 +2717,7 @@ void fsReadObjectInfo(byte txPort) {
   Serial.print(F(")"));
 
 
-  // TODO: Access control?
+  // No access control required, it's always possible to read attributes
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -2760,7 +2780,7 @@ void fsReadObjectInfo(byte txPort) {
     unsigned int fileAddress = dirEntry.firstClusterLow;
     bool directory = file.isDir();
     unsigned int fileSize = file.fileSize();
-    int fsDate = getEcoconfig_NetDate(&dirEntry);
+    int fsDate = getEconetDate(&dirEntry);
 
 
 
@@ -2944,7 +2964,11 @@ void fsSetObjectInfo(byte txPort) {
   Serial.print(F(")"));
 
 
-  // TODO: Access control?
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -3079,7 +3103,11 @@ void fsDelete(byte txPort, boolean oscli) {
   String fatPath = convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
 
-  //TODO: Access control - seriously!
+  if (!fatPath.startsWith(getURD(usrHdl),0)){
+    // User does not own parent directory
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   //fsError(0xBD,"Insufficient Access",txPort);
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -3722,7 +3750,7 @@ String convertToFATPath(String pathName, String basedir, byte errorPort) {
   return result;
 }
 
-int getEcoconfig_NetDate(dir_t* dirEntry) {
+int getEconetDate(dir_t* dirEntry) {
   int ecoDate;
   ecoDate = (FAT_YEAR(dirEntry->lastWriteDate) - 1981) << 1 & 224;
   ecoDate += FAT_DAY(dirEntry->lastWriteDate);
@@ -3826,11 +3854,14 @@ byte getAttributes(const char* objectName) {
         meta.close();
       } else {
         // No meta file (or error opening it)
-        attribute = 15; //Default to owner read and write access
+        attribute = 12; //Default to owner read and write access
       }
     }
     file.close();
-  } // return from open file. If file didn't open returning 0 is sensible
+  } else {
+      // File or directory failed to open, probably doesn't exist
+      attribute=12; //Default to owner read and write access
+  }
   return attribute;
 }
 
@@ -4197,7 +4228,6 @@ byte readConfigValueByte(String key) {
   }
 }
 
-
 void writeConfigValue(String key, String value) {
   FatFile handle;
   String configFile = config_confRoot + "/" + key;
@@ -4214,7 +4244,7 @@ void writeConfigValue(String key, String value) {
   }
 }
 
-void writeConfigValueByte(String key, byte value) {
+void writeConfigValueByte(String key, byte value) {  
   FatFile handle;
   String configFile = config_confRoot + "/" + key;
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
@@ -4227,4 +4257,32 @@ void writeConfigValueByte(String key, byte value) {
   } else {
     Serial.println("Failed to open / create config value " + configFile);
   }
+}
+
+boolean hasUserAccess(int usrHdl, String file, boolean readOnly){
+  if (isSystemUser(usrHdl)==true) return true; // System user, no point checking further.
+  file.toCharArray(pathBuff1, DIRENTRYSIZE);
+  int fileAttr=getAttributes(pathBuff1);
+
+
+  if (file.startsWith(getURD(usrHdl),0)){
+    // User is file owner
+    if (readOnly && (fileAttr & 4) ) return true; // File has owner read
+    if ((!readOnly) && (fileAttr & 8) ) return true; // File has owner write   
+    if (fileAttr & 32 ) return true; // It's a directory
+  } else {
+    // Not file owner
+    if (readOnly && (fileAttr & 1) ) return true; // File has public read
+    if ((!readOnly) && (fileAttr & 2) ) return true; // File has public write    
+    if (readOnly && (fileAttr & 32) ) return true; // It's a directory
+  }
+
+  return (false);  
+}
+
+boolean isObjectLocked(String file){
+  file.toCharArray(pathBuff1, DIRENTRYSIZE);
+  int fileAttr=getAttributes(pathBuff1);
+  if (fileAttr && (fileAttr & 16)) return true;
+  return false;
 }
