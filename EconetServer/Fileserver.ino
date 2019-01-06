@@ -1205,6 +1205,8 @@ void fsLoad(int txPort, boolean loadAs) {
 
 
   int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  bool foundFile=false;
+  
   if (usrHdl == -1) {
     fsError(0xBF, F("Who are you?"), txPort);
     return;
@@ -1214,9 +1216,11 @@ void fsLoad(int txPort, boolean loadAs) {
   String workingDir, libraryPath;
 
   workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
+  libraryPath = getDirectoryPath(usrHdl, rxBuff[8]);
 
   String objectName = getStringFromRX(9, 128);
   String fatPath = convertToFATPath(objectName, workingDir, txPort);
+  String libfatPath = convertToFATPath(objectName, libraryPath, txPort);
 
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
@@ -1226,94 +1230,89 @@ void fsLoad(int txPort, boolean loadAs) {
   Serial.print(dataTXPort);
   Serial.print(F(" working dir "));
   Serial.print(workingDir);
-  Serial.print(F(" disk path "));
+  Serial.print(F(" object path "));
   Serial.print(fatPath);
+  Serial.print(F(" loadas "));
+  Serial.print(loadAs);
+  Serial.print(F(" library object path "));
+  Serial.print(libfatPath);
 
-  // Check user has read access to file
-  if (!hasUserAccess(usrHdl,fatPath,true)){
-    // User does not have read access to file
-    fsError(0xBD,"Insufficient Access",txPort);
-    return; 
-  }  
-
-  // Open the file
+  
+  // Locate and open the file
   fatPath.toCharArray(pathBuff1, 128);
 
-  if (!loadAs) {
-    // Normal load operation
-    if (!sd.exists(pathBuff1)) {
-      //Object not found - send error and leave
+  if (!sd.exists(pathBuff1)){
+    if (!loadAs){
+      //Object not found, and not loadas - send error and leave
       Serial.print(" - ");
-      fsError(0xD6, F("Not found"), txPort);
+      fsError(0xFE, F("Bad command"), txPort);
       return;
-    }
-
-    if (file.open(pathBuff1, O_READ)) {
-      if (file.isDir()) {
-        file.close();
-        fsError(0xB5, F("Object is a directory"), txPort);
-        return;
-      }
-    }
+    }    
   } else {
-    //Load as operation - Already have file based on CSD, get Lib path too
-    libraryPath = getDirectoryPath(usrHdl, rxBuff[8]);
-    libraryPath.toCharArray(pathBuff4, 128);
+    // CSD object exists
+     if (hasUserAccess(usrHdl,fatPath,true)){
+      // User has access, try opening it
+      if (file.open(pathBuff1, O_READ)) {
+        foundFile=true;
+        if (file.isDir()) {
+          file.close();
+          foundFile=false;
+          if (!loadAs){
+            fsError(0xFE, F("Bad command"), txPort);
+            return;
+          }
+        }
+      } else {
+        // file open failed for some unknown reason, send error if not loadas
+        if (!loadAs){
+          fsError(0xFF, F("Unknown error opening object"), txPort);
+          return;
+        }        
+      }
+    } else {
+      // User does not have read access to file, error if not loadas
+      if (!loadAs){
+        fsError(0xBD,"Insufficient Access",txPort);
+        return; 
+      }
+    }   
+  }
 
-    if (!sd.exists(pathBuff1)) {
-      // Not found in CSD
+  // If we are here than either the file is open in the CSD, or it can't be opened but it's a loadas call
+  // which requires the library to be searched too.
 
-      if (!sd.exists(pathBuff4)) {
-        //Object not found in library either - send bad command as it's a load as operation
+  if (!foundFile){
+    // Need to search the library
+    libfatPath.toCharArray(pathBuff4, 128);
 
+    if (!sd.exists(pathBuff4)) {
+        //Object not found in library either - send error
         Serial.print(" - ");
         fsError(0xFE, "Bad command", txPort);
         return;
 
-      } else {
-        //File found in library
-
-        if (file.open(pathBuff4, O_READ)) {
-          if (file.isDir()) {
-            // but it's a directory
-            file.close();
-            fsError(0xFE, F("Bad command"), txPort);
-            return;
-          }
-        }
-      }
     } else {
-      // File found in CSD
+      //Object found in library
 
-      if (file.open(pathBuff1, O_READ)) {
+      if (!hasUserAccess(usrHdl,libfatPath,true)){
+        // User does not have read access to Object, send error
+        fsError(0xFE, F("Bad command"), txPort);
+        return; 
+      } 
+      // User has access, try opening it
+      if (file.open(pathBuff4, O_READ)) {
         if (file.isDir()) {
-          // but it's a directory
           file.close();
-
-          // Need to still check in the library
-          if (!sd.exists(pathBuff4)) {
-            //Object not found in library - send bad command as it's a load as operation
-
-            Serial.print(" - ");
-            fsError(0xFE, F("Bad command"), txPort);
-            return;
-
-          } else {
-            //File found in library
-
-            if (file.open(pathBuff4, O_READ)) {
-              if (file.isDir()) {
-                // but it's a directory
-                file.close();
-                fsError(0xFE, F("Bad command"), txPort);
-                return;
-              }
-            }
-          }
+          fsError(0xFE, F("Bad command"), txPort); // It's a directory, send error
+          return;
         }
+      } else {
+        // file open failed for some unknown reason, send error
+        fsError(0xFF, F("Unknown error opening object"), txPort);
+        return;
       }
-    }
-  }
+    } // end of is library object found   
+  } // end of is file open
 
   // If we've got this far, file should be open
 
@@ -1329,6 +1328,14 @@ void fsLoad(int txPort, boolean loadAs) {
   unsigned long execAddress = getExecAddressForObject(pathBuff1);
   unsigned long loadAddress = getLoadAddressForObject(pathBuff1);
   byte fileAttr = getAttributes(pathBuff1);
+
+  if (!foundFile){
+    // Library object was opened instead
+    execAddress = getExecAddressForObject(pathBuff4);
+    loadAddress = getLoadAddressForObject(pathBuff4);
+    fileAttr = getAttributes(pathBuff4);
+  }
+  
   int fsDate = getEconetDate(&dirEntry);
 
   Serial.print(F(" load addr "));
