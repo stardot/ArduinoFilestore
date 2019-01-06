@@ -1229,12 +1229,14 @@ void fsLoad(int txPort, boolean loadAs) {
   Serial.print(F(" disk path "));
   Serial.print(fatPath);
 
-
+  // Check user has read access to file
+  if (!hasUserAccess(usrHdl,fatPath,true)){
+    // User does not have read access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   // Open the file
-  // TODO: Access control here!
-
-
   fatPath.toCharArray(pathBuff1, 128);
 
   if (!loadAs) {
@@ -2572,8 +2574,8 @@ void fsReadCurrentUsers(int txPort) {
       txBuff[bufptr] = 0x0D; //Return character
       bufptr++;
 
-      // Add priv details (TODO)
-      txBuff[bufptr] = 0x00;
+      // Add priv details
+      txBuff[bufptr] = userPriv[thisRecord];
       bufptr++;
 
       recordsReturned++;
@@ -3400,9 +3402,12 @@ void fsCdir(byte txPort) {
   String fatPath = convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
 
-  //TODO: Access control - seriously!
+  if (!fatPath.startsWith(getURD(usrHdl),0)){
+    // User does not own parent directory
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  } 
 
-  //fsError(0xBD,"Insufficient Access",txPort);
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if (sd.exists(pathBuff1)) {
@@ -3514,8 +3519,11 @@ void fsCreateFile(int txPort) {
   Serial.print(fatPath);
   Serial.print(F(")"));
 
-  // TODO: Access control!
-  // TODO: Attribute and load/exec address mapping
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to file
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  } 
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
