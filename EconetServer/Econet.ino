@@ -312,7 +312,7 @@ boolean txFrame(int bytes){
   
   writeCR1(B00000000); // Disable RX interrupts, select address 1
 
-  timeOut=millis()+TXTIMEOUT;
+  timeOut=millis()+TXBEGINTIMEOUT;
   sr1=readSR1();
   
   while(!(sr1 & 64)){ // If we don't have TDRA, clear status until we do!  
@@ -426,7 +426,7 @@ boolean waitIdle(){
 
 //  digitalWriteDirect(PIN_LED,1);
   
-  unsigned long timeOut=millis()+2000;
+  unsigned long timeOut=millis()+TXBEGINTIMEOUT;
 
 
   sr2=0; // Force while loop to run first time
@@ -443,7 +443,7 @@ boolean waitIdle(){
     }
     
     if (millis()>timeOut){
-      Serial.println("Network not idle for 2 seconds - Line Jammed");
+      Serial.println("Network not idle for TXBEGINTIMEOUT milliseconds - Line Jammed");
       return(false);
     }
 
@@ -504,12 +504,15 @@ boolean waitForAck(){
   byte statReg1, statReg2;
   boolean ackResult=false, inLoop=true;
  
-  unsigned long timeOut=millis()+1;
+  unsigned long timeOut=millis()+ACKTIMEOUT;
 
   resetIRQ();
 
   while (inLoop){ // Enter IRQ polling loop
-    if (millis()>timeOut) inLoop=false;
+    if (millis()>timeOut) { 
+      inLoop=false;
+      Serial.println("Ack timeout");
+    }
 
     if (!digitalReadDirect(PIN_IRQ)){
       //There is an IRQ to service

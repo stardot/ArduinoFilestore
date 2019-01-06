@@ -47,7 +47,6 @@ void fsOperation (int bytes) {
       // ACCESS
       // INFO
       // LOGOFF
-      // FSSHUTDOWN
       else {
         txBuff[0] = rxBuff[2];
         txBuff[1] = rxBuff[3];
@@ -240,7 +239,7 @@ void fsOperation (int bytes) {
   }
 
   etherSelect(); // Reselect Etherconfig_Net card
-
+  Serial.println (F("FS operation complete - returning"));
 }
 
 void fsLogin(byte txPort, String command, int bytesRX) {

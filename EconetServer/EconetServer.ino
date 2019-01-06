@@ -38,14 +38,15 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define PROFILE_URD 34
 
 // Protocol retries and timeouts set here!
-#define SCOUTTIMEOUT 1000 // Milliseconds
-#define TXTIMEOUT 1000 // milliseconds
-#define TXRETRIES 50 // Number of times to retry a failed frame TX
-#define TXRETRYDELAY 100 //mS to wait between frame retries
+#define SCOUTTIMEOUT 100 // Milliseconds to wait for scout during RX
+#define TXBEGINTIMEOUT 5000 // Milliseconds to wait for network to become ready to TX frame before reporting line jammed
+#define TXRETRIES 5 // Number of times to retry a failed frame TX before reporting failed
+#define TXRETRYDELAY 200 //mS to wait between frame retries
+#define ACKTIMEOUT 100 // mS to wait for ack to arrive during TX
 
 #define BUFFSIZE 4096 // Size of TX, RX and work buffers
 #define MAXUSERS 10 // Total number of user sessions
-#define MAXDEPTH 20 // Maximum directory depth supported in CSD/LIB path
+#define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
 #define DIRENTRYSIZE (MAXDEPTH*11+2) // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
 #define MAXFILES 100 // Total maximum number of files  and folders open - note the reply port for block operations is 129+filehandle - keep this in mind when expanding!
 #define MAXUSERFILES 10 // Maximum files open per login
