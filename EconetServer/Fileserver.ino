@@ -2997,51 +2997,52 @@ void fsSetObjectInfo(byte txPort) {
   if (!file.open(pathBuff1, O_READ)) {
     // File open failed
     // TODO better error response
-    fsError(0xBD, "File open failed, because reasons!", txPort);
+    fsError(0xBD, "File open failed", txPort);
     return;
   }
 
   boolean isDir = file.isDir();
   file.close();
 
+  String metaPath=fatPath;
+  metaPath.replace(config_FSRoot, config_MetaRoot);
+
   if (!isDir) {
-    //Now update the meta entry
-    fatPath.replace(config_FSRoot, config_MetaRoot);
-    fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
+    //Object is a file,  update the meta entry
+    metaPath.toCharArray(pathBuff2, DIRENTRYSIZE);
 
     if (!file.exists(pathBuff2)) {
-      // Create the missing metafile first
+      // Create the missing metafile first to populate defaults
       if (!createMetaFile(fatPath)) {
         fsError(0xFF, "Metafile creation failed", txPort);
         return;
       }
     }
 
-    if (!file.open(pathBuff2, (O_RDWR | O_CREAT))) {
+    if (!file.open(pathBuff2, O_RDWR)) {
       // File create failed
       // TODO better error response
-      fsError(0xBD, "Metadata file open/create failed, because reasons", txPort);
+      fsError(0xBD, "Metadata file open failed", txPort);
       return;
     }
   } else {
 
-    //Now create the folder meta entry
-    fatPath.replace(config_FSRoot, config_MetaRoot);
-    fatPath = fatPath + "/$";
-    fatPath.toCharArray(pathBuff2, DIRENTRYSIZE);
+    //Object is a folder, update the folder meta entry    
+    metaPath = metaPath + "/$";
+    metaPath.toCharArray(pathBuff2, DIRENTRYSIZE);
 
     if (!file.exists(pathBuff2)) {
-      // Create the missing metafile first
+      // Create the missing metafile first to populate defaults
       if (!createMetaFile(fatPath)) {
         fsError(0xFF, "Metafile creation failed", txPort);
         return;
       }
     }
 
-    if (!file.open(pathBuff2, (O_RDWR | O_CREAT))) {
+    if (!file.open(pathBuff2, O_RDWR)) {
       // File create failed
       // TODO better error response
-      fsError(0xBD, "Metadata file open/create failed, because reasons", txPort);
+      fsError(0xBD, "Metadata file open failed, because reasons", txPort);
       return;
     }
   }
@@ -3052,7 +3053,7 @@ void fsSetObjectInfo(byte txPort) {
       Serial.print("(" + (String)rxBuff[18] + ")");
       if (isDir) {
         rxBuff[18] = rxBuff[18] | 32; // Make sure directory flag is preserved
-        rxBuff[18] = rxBuff[18] & 115; // Filter out owner attributes which are unused by config_NetFS
+        rxBuff[18] = rxBuff[18] & 115; // Filter out owner attributes which are unused by NetFS
       }
       Serial.print("(" + (String)rxBuff[18] + ")");
       file.write(&rxBuff[10], 9);
