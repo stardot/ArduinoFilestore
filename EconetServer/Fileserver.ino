@@ -1075,9 +1075,9 @@ void fsSave(int txPort) {
   Serial.print(F(" "));
 
 
-  if (!hasUserAccess(usrHdl,fatPath,false)){
-    // User does not have write access to file
-    fsError(0xBD,"Insufficient Access",txPort);
+  if (isObjectLocked(fatPath)){
+    // Object locked 
+    fsError(0xBD,"Access violation",txPort);
     return; 
   }  
 
@@ -1091,6 +1091,21 @@ void fsSave(int txPort) {
     }
     file.close();
   }
+
+  if(sd.exists(pathBuff1)){
+    if (!hasUserAccess(usrHdl,fatPath,false)){  
+      // User does not have write access to existing file
+      fsError(0xBD,"Insufficient Access",txPort);
+      return;
+    } 
+  } else { 
+    if (!fatPath.startsWith(getURD(usrHdl),0) && !isSystemUser(usrHdl)){
+      // File does not exist, and user does not own parent directory
+      fsError(0xBD,"Insufficient Access",txPort);
+      return; 
+    } 
+  }
+
 
   int fHdl = 1;
   while (fHandleActive[fHdl] && fHdl < MAXFILES) {
@@ -1704,9 +1719,9 @@ void fsOpen(int txPort) {
   Serial.print(F(" disk path "));
   Serial.print(fatPath);
 
-  if (!hasUserAccess(usrHdl,fatPath,readOnly)){
-    // User does not have access to file
-    fsError(0xBD,"Insufficient Access",txPort);
+  if (isObjectLocked(fatPath) && !readOnly){
+    // Object locked 
+    fsError(0xBD,"Access violation",txPort);
     return; 
   }  
 
@@ -1726,6 +1741,22 @@ void fsOpen(int txPort) {
     }
     file.close();
   }
+  
+  if(sd.exists(pathBuff1)){
+    if (!hasUserAccess(usrHdl,fatPath,readOnly)){  
+      // User does not have appropriate access to existing file
+      fsError(0xBD,"Access violation",txPort);
+      return;
+    } 
+  } else { 
+    if (!fatPath.startsWith(getURD(usrHdl),0) && !isSystemUser(usrHdl)){
+      // Request to create a new file, and user does not own parent directory
+      fsError(0xBD,"Insufficient Access",txPort);
+      return; 
+    } 
+  }
+
+
 
   int fHdl = 1;
   while (fHandleActive[fHdl] && fHdl < MAXFILES) {
@@ -2879,7 +2910,7 @@ void fsReadObjectInfo(byte txPort) {
       bufpos += 10;
 
       String urd = getURD(usrHdl);
-      if (fatPath.startsWith(urd, 0)) txBuff[bufpos] = 0x00; else txBuff[bufpos] = 0xFF; // Directory access rights (0x00= Owner, 0xFF = Public)
+      if (fatPath.startsWith(urd, 0) || isSystemUser(usrHdl)) txBuff[bufpos] = 0x00; else txBuff[bufpos] = 0xFF; // Directory access rights (0x00= Owner, 0xFF = Public)
 
       bufpos++;
 
@@ -2969,11 +3000,7 @@ void fsSetObjectInfo(byte txPort) {
   Serial.print(F(")"));
 
 
-  if (!hasUserAccess(usrHdl,fatPath,false)){
-    // User does not have write access to file
-    fsError(0xBD,"Insufficient Access",txPort);
-    return; 
-  }  
+
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
@@ -2993,6 +3020,12 @@ void fsSetObjectInfo(byte txPort) {
     fsError(0xD6, pathName + " Not found", txPort);
     return;
   }
+
+  if (!fatPath.startsWith(getURD(usrHdl),0) && !isSystemUser(usrHdl)){
+    // User does not own parent directory
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
 
   if (!file.open(pathBuff1, O_READ)) {
     // File open failed
@@ -3109,13 +3142,18 @@ void fsDelete(byte txPort, boolean oscli) {
   String fatPath = convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
 
-  if (!fatPath.startsWith(getURD(usrHdl),0)){
-    // User does not own parent directory
+  if (!hasUserAccess(usrHdl,fatPath,false)){
+    // User does not have write access to object
     fsError(0xBD,"Insufficient Access",txPort);
     return; 
   }  
 
-  //fsError(0xBD,"Insufficient Access",txPort);
+  if (isObjectLocked(fatPath)){
+    // Object locked against deletion
+    fsError(0xBD,"Locked",txPort);
+    return; 
+  }  
+
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if (!sd.exists(pathBuff1)) {
@@ -3406,7 +3444,7 @@ void fsCdir(byte txPort) {
   String fatPath = convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
 
-  if (!fatPath.startsWith(getURD(usrHdl),0)){
+  if (!fatPath.startsWith(getURD(usrHdl),0) && !isSystemUser(usrHdl)){
     // User does not own parent directory
     fsError(0xBD,"Insufficient Access",txPort);
     return; 
