@@ -511,7 +511,7 @@ boolean waitForAck(){
   while (inLoop){ // Enter IRQ polling loop
     if (millis()>timeOut) { 
       inLoop=false;
-      Serial.println("Ack timeout");
+      Serial.print("Ack timeout, ");
     }
 
     if (!digitalReadDirect(PIN_IRQ)){
@@ -634,4 +634,3 @@ void bridgeProbe(){
 
   if (!txFrame(14)){ Serial.println(F("Failed to send bridge discovery broadcast"));};
 }
-

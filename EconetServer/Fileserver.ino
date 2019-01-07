@@ -238,8 +238,8 @@ void fsOperation (int bytes) {
       break;
   }
 
-  etherSelect(); // Reselect Etherconfig_Net card
-  Serial.println (F("FS operation complete - returning"));
+  etherSelect(); // Reselect EtherNet card
+  Serial.print (F("# "));
 }
 
 void fsLogin(byte txPort, String command, int bytesRX) {
@@ -1263,23 +1263,19 @@ void fsLoad(int txPort, boolean loadAs) {
           }
         }
       } else {
-        // file open failed for some unknown reason, send error if not loadas
-        if (!loadAs){
-          fsError(0xFF, F("Unknown error opening object"), txPort);
-          return;
-        }        
+        // file open failed for some unknown reason
+        fsError(0xFF, F("Unknown error opening object"), txPort);
+        return;
       }
     } else {
-      // User does not have read access to file, error if not loadas
-      if (!loadAs){
-        fsError(0xBD,"Insufficient Access",txPort);
-        return; 
-      }
+      // User does not have read access to file
+      fsError(0xBD,"Insufficient Access",txPort);
+      return; 
     }   
   }
 
-  // If we are here than either the file is open in the CSD, or it can't be opened but it's a loadas call
-  // which requires the library to be searched too.
+  // If we are here than either the file is open in the CSD (foundFile true), or it's missing or a directory
+  // but as it's a loadas call the library needs to be searched too.
 
   if (!foundFile){
     // Need to search the library
@@ -1296,7 +1292,7 @@ void fsLoad(int txPort, boolean loadAs) {
 
       if (!hasUserAccess(usrHdl,libfatPath,true)){
         // User does not have read access to Object, send error
-        fsError(0xFE, F("Bad command"), txPort);
+        fsError(0xBD,"Insufficient Access",txPort);
         return; 
       } 
       // User has access, try opening it
