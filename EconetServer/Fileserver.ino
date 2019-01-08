@@ -1024,7 +1024,7 @@ void fsSave(int txPort) {
 
   workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
 
-  //TODO: DO something useful with attributes
+  byte attribs=12; //Default owner read and write access to file
 
   unsigned long loadaddr, execaddr, fsize;
 
@@ -1074,7 +1074,6 @@ void fsSave(int txPort) {
   Serial.print(fatPath);
   Serial.print(F(" "));
 
-
   if (isObjectLocked(fatPath)){
     // Object locked 
     fsError(0xBD,"Access violation",txPort);
@@ -1093,6 +1092,9 @@ void fsSave(int txPort) {
   }
 
   if(sd.exists(pathBuff1)){
+    // Store attributes for later
+    attribs=getAttributes(pathBuff1);
+    
     if (!hasUserAccess(usrHdl,fatPath,false)){  
       // User does not have write access to existing file
       fsError(0xBD,"Insufficient Access",txPort);
@@ -1105,7 +1107,6 @@ void fsSave(int txPort) {
       return; 
     } 
   }
-
 
   int fHdl = 1;
   while (fHandleActive[fHdl] && fHdl < MAXFILES) {
@@ -1162,7 +1163,7 @@ void fsSave(int txPort) {
   }
 
   file.write(&rxBuff[9], 8); //Load and Exec address
-  file.write(12); //Owner access only attributes - TODO: Default create attributes?
+  file.write(attribs); 
   file.close();
 
 
