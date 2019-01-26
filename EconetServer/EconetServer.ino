@@ -44,7 +44,7 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define TXRETRYDELAY 200 //mS to wait between frame retries
 #define ACKTIMEOUT 100 // mS to wait for ack to arrive during TX
 
-#define BUFFSIZE 4096 // Size of TX, RX and work buffers
+#define BUFFSIZE 16384 // Size of TX, RX and work buffers
 #define MAXUSERS 10 // Total number of user sessions
 #define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
 #define DIRENTRYSIZE (MAXDEPTH*11+2) // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.

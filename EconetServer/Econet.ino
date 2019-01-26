@@ -461,7 +461,6 @@ boolean txWithHandshake(int lastByte, int port, int controlByte){
   while (attempt<TXRETRIES){
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
-    //Serial.print(" txretry ");
     delay(TXRETRYDELAY);
   }
   return(false);
@@ -511,7 +510,6 @@ boolean waitForAck(){
   while (inLoop){ // Enter IRQ polling loop
     if (millis()>timeOut) { 
       inLoop=false;
-      Serial.print("Ack timeout, ");
     }
 
     if (!digitalReadDirect(PIN_IRQ)){

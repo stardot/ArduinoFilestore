@@ -40,6 +40,7 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("REMUSER")) fsRemUser(replyPort, bytes);
       else if (param1C.startsWith("PRIV")) fsSetUserPriv(replyPort, bytes);
       else if (param1C.startsWith("PASS")) fsChangePassword(replyPort, bytes);
+      else if (param1C.startsWith("SDISC")) fsChangeDisc(replyPort, bytes);
       else if (param1C.startsWith("SETURD")) fsSetUserRoot(replyPort, bytes);
       else if (param1C.startsWith("FSSHUTDOWN")) fsShutdown(replyPort, false);
       else if (param1C.startsWith("FSREBOOT")) fsShutdown(replyPort, true);
@@ -857,6 +858,39 @@ void fsChangePassword(byte txPort, int bytesRx) {
   if (txWithHandshake(6, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
 }
 
+void fsChangeDisc(byte txPort, int bytesRx) {
+  
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  String availDisc=config_FSName;
+  String newDisc = getStringFromRX(15, bytesRx - 15);
+
+  Serial.print(" User: "+(String)usrHdl+" requesting "+newDisc);
+
+  availDisc.toUpperCase();
+  newDisc.toUpperCase();
+
+  //TODO: This will need to change once additional volume support added
+
+  if(newDisc.equals(availDisc)){
+    txBuff[0] = rxBuff[2];
+    txBuff[1] = rxBuff[3];
+    txBuff[2] = rxBuff[0];
+    txBuff[3] = rxBuff[1];
+    txBuff[4] = 0; // Command code
+    txBuff[5] = 0; // Is successful
+
+    if (txWithHandshake(6, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
+  } else {
+    fsError(0xCD, F("Bad Drive"), txPort);
+  }
+}
+
 void fsSetUserRoot(byte txPort, int bytesRx) {
   FatFile profileHdl;
   sdSelect(); // Make sure SD card is selected on the SPI bus
@@ -1178,7 +1212,7 @@ void fsSave(int txPort) {
     txBuff[6] = dataPort;
     txBuff[7] = maxTXSize;
     txBuff[8] = maxTXSize << 8;
-    if (txWithHandshake(9, txPort, rxControlByte)) Serial.print(F(" "));
+    if (txWithHandshake(9, txPort, rxControlByte)) Serial.println(F(" "));
     else {
       Serial.println(F("- setup TX Failed"));
       return;
@@ -2226,7 +2260,7 @@ void fsPutBytes(int txPort) {
   txBuff[6] = dataPort;
   txBuff[7] = maxTXSize;
   txBuff[8] = maxTXSize << 8;
-  if (txWithHandshake(9, txPort, rxControlByte)) Serial.print(F(""));
+  if (txWithHandshake(9, txPort, rxControlByte)) Serial.println(F(""));
   else {
     Serial.println(F("- setup TX Failed"));
     return;
@@ -2234,7 +2268,7 @@ void fsPutBytes(int txPort) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Function 11.1 - Save / Put Bytes (Bulk transfer received)
+// Bulk incoming transfer received - set up by Function 1 Save File, or Function 11 put bytes
 /////////////////////////////////////////////////////////////////////
 
 void fsBulkRXArrived(int rxPort, int bytesRX) {
@@ -2294,12 +2328,13 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     txBuff[2] = config_Station;
     txBuff[3] = config_Net;
     txBuff[4] = 0x00; // Any byte can be sent as the ack
+
     if (!txWithHandshake(5, ackPort, rxControlByte)) {
-      Serial.print(F("- Ack Failed"));
-      delay(500);
-      if (!txWithHandshake(5, ackPort, rxControlByte)) {
-        Serial.print(F(" - Ack retry Failed"));
-      }
+      Serial.println(F("Client failed to acknowledge during bulk transfer"));
+      // Clear out the ADLC before returning
+      readFIFO();
+      resetIRQ();
+      return;
     }
   } else {
     // All expected bytes received
@@ -2327,7 +2362,11 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[6] = 15; // TODO: correct attributes (hardcoded to allow all access, not locked)
       txBuff[7] = fsDate;
       txBuff[8] = fsDate << 8 ;
-      if (txWithHandshake(9, replyPort, rxControlByte)) Serial.println(F("")); else Serial.println(F("- Final Ack Failed"));
+
+      if (!txWithHandshake(9, replyPort, rxControlByte)) {
+        Serial.println(F("Ack failed at end of save bulk transfer"));
+        return; // return without closing, as final frame may get sent again
+      }
 
       // Close the filehandle and mark inactive in the table
       fHandle[fileHandle].truncate(expectingBytes[fileHandle]); // Ensure file is correct size - might be overwriting existing file
@@ -2348,9 +2387,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[8] = expectingBytes[fileHandle] << 8 ;
       txBuff[9] = expectingBytes[fileHandle] << 16;
 
-      if (txWithHandshake(10, replyPort, rxControlByte)) Serial.println(F("")); else Serial.println(F("- Final Ack Failed"));
-
-    }
+      if (!txWithHandshake(10, replyPort, rxControlByte)) Serial.print(F("Ack failed at end of put bulk transfer"));
+    }   
   }
 }
 
@@ -4055,6 +4093,7 @@ int fsGetUserHdl(byte config_Net, byte station) {
   }
   return (-1);
 }
+
 String readBuff(char *buff, int start, int limit) {
   String output = "";
   int ptr = 0;
