@@ -12,7 +12,7 @@ String config_confRoot="/config";
 String config_FSRoot="/export"; 
 String config_MetaRoot="/meta";
 String config_ProfileRoot="/users";
-byte config_Station=170;
+byte config_Station=169;
 String config_FSName="Arduino170";
 byte config_Net=0; // TODO: Not strictly speaking config, Needs a bridge discovery to fix this later on
 String config_etherMAC="00:00:00:00:00:00";
@@ -264,12 +264,12 @@ void setup() {
     else Serial.println("FS profile folder not present, and failed to mkdir "+config_ProfileRoot);  
   }
 
-  byte config_Station_Temp=readConfigValueByte("Station");
+  int config_Station_Temp=readConfigValueAsInt("Station");;
   if (config_Station_Temp < 2 || config_Station_Temp > 254) {
     Serial.println("Station number invalid, using "+String(config_Station)+" instead");
-    writeConfigValueByte("Station",config_Station);
+    writeConfigValue("Station",(String)config_Station);
   } else {
-    config_Station=config_Station_Temp;
+    config_Station=(byte)config_Station_Temp;
   }
 
   Serial.println("Station is "+String(config_Net)+"."+String(config_Station));

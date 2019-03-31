@@ -48,6 +48,7 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("CDIR")) fsCdir(replyPort,true);   
       else if (param1C.startsWith("INFO")) fsInfo(replyPort,false);   
       else if (param1C.startsWith("I.")) fsInfo(replyPort,true); 
+      else if (param1C.startsWith("FSSTATUS")) fsStatus(replyPort,bytes); 
 
       // Unimplemented commands are:
       // ACCESS
@@ -1252,6 +1253,63 @@ void fsShutdown(byte txPort, bool reboot) {
   pmc_enable_sleepmode(0);
 
 }
+
+void fsStatus(byte txPort, int bytesRx) {
+  FatFile profileHdl;
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  String key = getStringFromRX(18, bytesRx - 18);
+
+  Serial.print(" User: ");
+  Serial.print(usrHdl);
+  Serial.print(" Status: ");
+  Serial.print(key);
+
+  if (!isSystemUser(usrHdl)) {
+    fsError(0xBA, F("Insufficient privilege"), txPort);
+    return;
+  }
+  key.toUpperCase();
+
+  if (key.length() == 0) {
+    fsError(0xCC, F("No key supplied"), txPort);
+    return;
+  }
+
+  String store = config_confRoot;
+  store = store + "/" + key;
+  //store = store + key;
+
+  store.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  if (!sd.exists(pathBuff1)) {
+    fsError(0xBC, "Key not known", txPort);
+    return;
+  }
+  String value=readConfigValue(key);
+  Serial.print(" Result: ");
+  Serial.print(value);
+
+  value+="\r";
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = rxBuff[0];
+  txBuff[3] = rxBuff[1];
+  txBuff[4] = 0; // Command code
+  txBuff[5] = 0x80; // Return code (undefined - causes client to print string)
+  writeStringtoTX(value, 6, value.length());
+
+  if (txWithHandshake(6+value.length(), txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function 1 - Save
@@ -4665,28 +4723,25 @@ String readConfigValue(String key) {
   }
 }
 
-byte readConfigValueByte(String key) {
+int readConfigValueAsInt(String key) {
   FatFile handle;
+  int result;
   String configFile = config_confRoot + "/" + key;
   //Serial.print("Reading from " + configFile + ",");
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
-  
   if (handle.open(pathBuff1, (O_READ))) {
-    int bytesRead = handle.read(&workBuff, 1);
+    int bytesRead = handle.read(&workBuff, 255);
     handle.close();
 
-    if (bytesRead<1){
-      Serial.println("Reading from " + configFile +" - file read failed");
-      return (0);
-    }
+    if (bytesRead == 0) return (0);
+    workBuff[bytesRead]=0; // Mark the end of string
 
-    byte value = workBuff[0];
-//    Serial.println(" got byte value " + String(value));
-    return (value);
+    String value = String((char *)&workBuff);
+    result=value.toInt();
+    return (result);
 
   } else {
-    Serial.print("! ");
-    // Serial.println(" "Reading from " + configFile + - file failed to open");
+    //Serial.println(" file failed to open");
     return (0);
   }
 }
@@ -4700,21 +4755,6 @@ void writeConfigValue(String key, String value) {
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
     Serial.print("Writing " + value + " to " + configFile);
     handle.write(&confBuff,value.length());
-    handle.close();
-    Serial.println(" done");
-  } else {
-    Serial.println("Failed to open / create config value " + configFile);
-  }
-}
-
-void writeConfigValueByte(String key, byte value) {  
-  FatFile handle;
-  String configFile = config_confRoot + "/" + key;
-  configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
-
-  if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-    Serial.print("Writing byte " + String(value) + " to " + configFile );
-    handle.write(value);
     handle.close();
     Serial.println(" done");
   } else {
