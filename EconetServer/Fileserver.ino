@@ -44,12 +44,13 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("SETURD")) fsSetUserRoot(replyPort, bytes);
       else if (param1C.startsWith("FSSHUTDOWN")) fsShutdown(replyPort, false);
       else if (param1C.startsWith("FSREBOOT")) fsShutdown(replyPort, true);
-      else if (param1C.startsWith("BYE")) fsBye(replyPort);     
+      else if (param1C.startsWith("BYE")) fsBye(replyPort);  
+      else if (param1C.startsWith("CDIR")) fsCdir(replyPort,true);   
       // Unimplemented commands are:
       // ACCESS
       // INFO
       // LOGOFF
-      // CDIR
+
       else {
         txBuff[0] = rxBuff[2];
         txBuff[1] = rxBuff[3];
@@ -188,7 +189,7 @@ void fsOperation (int bytes) {
 
     case 27:
       Serial.print(F("Create directory "));
-      fsCdir(replyPort);
+      fsCdir(replyPort,false);
       break;
 
     // TODO: 28 - Set FS Clock
@@ -3465,7 +3466,7 @@ void fsReaddiskFree(byte txPort) {
 // Function 27 - Create Directory
 /////////////////////////////////////////////////////////////////////
 
-void fsCdir(byte txPort) {
+void fsCdir(byte txPort, boolean oscli) {
   FatFile file;
   sdSelect(); // Make sure SD card is selected on the SPI bus
 
@@ -3477,8 +3478,8 @@ void fsCdir(byte txPort) {
 
   String workingDir;
   workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
-
-  String newDir = getStringFromRX(10, DIRENTRYSIZE);
+  String newDir;
+  if (!oscli) newDir = getStringFromRX(10, DIRENTRYSIZE); else newDir = getStringFromRX(14, DIRENTRYSIZE);
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" new directory: ");
