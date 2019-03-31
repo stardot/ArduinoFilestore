@@ -48,9 +48,9 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("CDIR")) fsCdir(replyPort,true);   
       else if (param1C.startsWith("INFO")) fsInfo(replyPort,false);   
       else if (param1C.startsWith("I.")) fsInfo(replyPort,true); 
+
       // Unimplemented commands are:
       // ACCESS
-      // INFO
       // LOGOFF
 
       else {
