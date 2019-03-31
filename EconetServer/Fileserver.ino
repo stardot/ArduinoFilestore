@@ -1588,6 +1588,8 @@ void fsExamine(int txPort) {
     int fsDate = getEconetDate(&dirEntry);
     String fcName=pathBuff4;
     fcName.replace(".","/");
+    String text="";
+    int padding=0;
     
     switch (format) {
       case 0:
@@ -1644,7 +1646,122 @@ void fsExamine(int txPort) {
         txBuff[bufpos] = fileSize >> 16;
         bufpos++;
         break;
+        
+      case 1:
+        // All information in human readable format
 
+        //Send name first
+        writeStringtoTX(fcName, bufpos, 10);    //TODO: If root send $
+        bufpos += 10;
+        txBuff[bufpos] = 32;
+        bufpos++;
+
+        // Load address
+        text=String(loadAddress,HEX);
+
+        while (text.length() < 8){
+          // Pad address if short
+          text="0"+text;
+        }
+
+        text.toUpperCase();
+
+        writeStringtoTX(text, bufpos, 8);    //TODO: If root send $
+        bufpos += 8;
+        txBuff[bufpos] = 32;
+        bufpos++;
+        
+        // Exec address
+        text=String(execAddress,HEX);
+
+        while (text.length() < 8){
+          // Pad address if short
+          text="0"+text;
+        }
+
+        text.toUpperCase();
+
+        writeStringtoTX(text, bufpos, 8);  
+        bufpos += 8;
+        txBuff[bufpos] = 32;
+        bufpos++;
+        
+        // Length
+        text=String(fileSize,HEX);
+
+        while (text.length() < 8){
+          // Pad address if short
+          text="0"+text;
+        }
+
+        text.toUpperCase();
+
+        writeStringtoTX(text, bufpos, 8);   
+        bufpos += 8;
+        txBuff[bufpos] = 32;
+        bufpos++;
+
+        // 7 characters access attributes - padded out to 8 characters
+        padding = 1;
+        if ((fileAttr & 64) || (fileAttr & 16)) {
+          txBuff[bufpos] = 76;
+          bufpos ++;
+        } else padding++; // Locked
+        if (fileAttr & 32) {
+          txBuff[bufpos] = 68;
+          bufpos ++;
+        } else padding++; // Directory
+        if (fileAttr & 8) {
+          txBuff[bufpos] = 87;
+          bufpos ++;
+        } else padding++; // Owner W
+        if (fileAttr & 4) {
+          txBuff[bufpos] = 82;
+          bufpos ++;
+        } else padding++; // Owner R
+        txBuff[bufpos] = 47; // / seperator
+        bufpos++;
+        if (fileAttr & 2) {
+          txBuff[bufpos] = 119;
+          bufpos ++;
+        } else padding++; // Public w
+        if (fileAttr & 1) {
+          txBuff[bufpos] = 114;
+          bufpos ++;
+        } else padding++; // Public r
+
+        while (padding > 0) {
+          txBuff[bufpos] = 32;
+          bufpos++;
+          padding--;
+        }
+
+        // Econet date
+        text=econetDateToString(fsDate);
+        writeStringtoTX(text, bufpos, 8); 
+        bufpos += 8;
+        txBuff[bufpos] = 32;
+        bufpos++;
+
+
+        // System Internal Numbner
+        text=String(fileAddress,HEX);
+
+        while (text.length() < 6){
+          // Pad address if short
+          text="0"+text;
+        }
+
+        text.toUpperCase();
+
+        writeStringtoTX(text, bufpos, 8);   
+        bufpos += 8;
+       
+        // Terminator
+        txBuff[bufpos] = 0;
+        bufpos++;
+        break;
+        
       case 2:
         // 10 character filename short format
 
@@ -1664,7 +1781,7 @@ void fsExamine(int txPort) {
         bufpos += 10;
 
         // 7 characters access attributes - padded out to 8 characters
-        int padding = 1;
+        padding = 1;
         if ((fileAttr & 64) || (fileAttr & 16)) {
           txBuff[bufpos] = 76;
           bufpos ++;
@@ -3849,6 +3966,23 @@ int getEconetDate(dir_t* dirEntry) {
   ecoDate += (FAT_YEAR(dirEntry->lastWriteDate) - 1981) << 12;
   ecoDate += FAT_MONTH(dirEntry->lastWriteDate) << 8;
 
+}
+
+String econetDateToString(int ecoDate){
+  int mnthday=(ecoDate & 31);
+  int mnth = (ecoDate & 3840)>>8;
+  int yr=ecoDate>>12;
+  yr+=(ecoDate &224)>1;
+  yr+=1981;
+  String ds=(String)mnthday;
+  if (ds.length()==1) ds="0"+ds; // Make day 2 digits if necessary
+  String ms=(String)mnth;
+  if (ms.length()==1) ms="0"+ms; // Make month 2 digits if necessary
+  String yrs=(String)yr;
+  yrs=yrs.substring(yrs.length()-2); // reduce year to 2 digits
+  String result=ds+"/"+ms+"/"+yrs;
+
+  return(result);
 }
 
 boolean createMetaFile(String path) {
