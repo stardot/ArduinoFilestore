@@ -5,6 +5,7 @@ By default the software will create the following folder in the root directory o
 - export
 - meta
 - profile
+- config
 
 ## export folder
 This holds the files that have been stored on the fileserver. Case of files is preserved in their creation but like a real 
