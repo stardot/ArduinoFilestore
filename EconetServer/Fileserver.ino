@@ -44,10 +44,12 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("SETURD")) fsSetUserRoot(replyPort, bytes);
       else if (param1C.startsWith("FSSHUTDOWN")) fsShutdown(replyPort, false);
       else if (param1C.startsWith("FSREBOOT")) fsShutdown(replyPort, true);
+      else if (param1C.startsWith("BYE")) fsBye(replyPort);     
       // Unimplemented commands are:
       // ACCESS
       // INFO
       // LOGOFF
+      // CDIR
       else {
         txBuff[0] = rxBuff[2];
         txBuff[1] = rxBuff[3];
