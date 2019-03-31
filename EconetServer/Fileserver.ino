@@ -49,6 +49,7 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("INFO")) fsInfo(replyPort,false);   
       else if (param1C.startsWith("I.")) fsInfo(replyPort,true); 
       else if (param1C.startsWith("FSSTATUS")) fsStatus(replyPort,bytes); 
+      else if (param1C.startsWith("FSCONFIGURE")) fsConfigure(replyPort,bytes); 
 
       // Unimplemented commands are:
       // ACCESS
@@ -1311,6 +1312,57 @@ void fsStatus(byte txPort, int bytesRx) {
 }
 
 
+void fsConfigure(byte txPort, int bytesRx) {
+  FatFile profileHdl;
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  String key = getStringFromRX(21, bytesRx - 21);
+
+  String value = getStringFromRX(22+key.length(), bytesRx - 22 - key.length());
+  
+  Serial.print(" User: "+(String)usrHdl);
+  Serial.print(" Key: "+key);
+  Serial.print(" Value: '"+value+"'");
+
+  if (!isSystemUser(usrHdl)) {
+    fsError(0xBA, F("Insufficient privilege"), txPort);
+    return;
+  }
+  key.toUpperCase();
+
+  if (key.length() == 0) {
+    fsError(0xCC, F("No key supplied"), txPort);
+    return;
+  }
+
+  String store = config_confRoot;
+  store = store + "/" + key;
+  //store = store + key;
+
+  store.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  if (!sd.exists(pathBuff1)) {
+    fsError(0xBC, "Key not known", txPort);
+    return;
+  }
+  writeConfigValue(key,value);
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = rxBuff[0];
+  txBuff[3] = rxBuff[1];
+  txBuff[4] = 0; // Command code
+  txBuff[5] = 0; // Return code (no further action required)
+
+  if (txWithHandshake(6 , txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
+}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function 1 - Save
 /////////////////////////////////////////////////////////////////////
@@ -4750,11 +4802,14 @@ void writeConfigValue(String key, String value) {
   FatFile handle;
   String configFile = config_confRoot + "/" + key;
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  Serial.print("Writing " + value + " to " + configFile);
+
   value.toCharArray(confBuff,255);
 
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-    Serial.print("Writing " + value + " to " + configFile);
     handle.write(&confBuff,value.length());
+    handle.truncate(value.length());
     handle.close();
     Serial.println(" done");
   } else {

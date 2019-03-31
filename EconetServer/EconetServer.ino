@@ -12,7 +12,7 @@ String config_confRoot="/config";
 String config_FSRoot="/export"; 
 String config_MetaRoot="/meta";
 String config_ProfileRoot="/users";
-byte config_Station=169;
+byte config_Station=170;
 String config_FSName="Arduino170";
 byte config_Net=0; // TODO: Not strictly speaking config, Needs a bridge discovery to fix this later on
 String config_etherMAC="00:00:00:00:00:00";
@@ -279,6 +279,8 @@ void setup() {
     config_FSName="Arduino"+String(config_Station);
     writeConfigValue("FSName",config_FSName);
   }   
+
+  Serial.println("Disc name is "+String(config_FSName)+".");
 
   byte mac[] = {0, 0, 0, 0, 0, 0};
   config_etherMAC=readConfigValue("MAC");
