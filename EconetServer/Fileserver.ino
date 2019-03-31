@@ -4308,7 +4308,7 @@ byte readConfigValueByte(String key) {
     }
 
     byte value = workBuff[0];
-    //Serial.println(" got byte value " + String(value));
+//    Serial.println(" got byte value " + String(value));
     return (value);
 
   } else {
@@ -4325,7 +4325,7 @@ void writeConfigValue(String key, String value) {
   value.toCharArray(confBuff,255);
 
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-//    Serial.print("Writing " + value + " to " + configFile);
+    Serial.print("Writing " + value + " to " + configFile);
     handle.write(&confBuff,value.length());
     handle.close();
     Serial.println(" done");
@@ -4340,7 +4340,7 @@ void writeConfigValueByte(String key, byte value) {
   configFile.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if (handle.open(pathBuff1, (O_RDWR | O_CREAT))) {
-//    Serial.print("Writing byte " + String(value) + " to " + configFile );
+    Serial.print("Writing byte " + String(value) + " to " + configFile );
     handle.write(value);
     handle.close();
     Serial.println(" done");
