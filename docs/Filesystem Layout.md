@@ -41,6 +41,8 @@ Layout of the user file is:
 The default name of the folder is profile, however this can be changed in the server configuration profile.
 
 ## config folder
-The statup configuration of the server is contained in a number of key / value pairs. Each configuration key has a file in this folder named after the key, which contains its value. The format of each file is undefined, and it's up the the server to parse the content correctly.
+The statup configuration of the server is contained in a number of key / value pairs. Each configuration value is contained in a file in this folder named after the key. All values are stored as strings, and the FS code will cast between datatypes as required. 
+
+You can examine a configuration value with *FSSTATUS _key_, and the values can be changed with *FSCONFIGURE _key_ _value_ from a station logged on with system rights.
 
 The folder name is hard coded as config, and requires a code change to modify.
