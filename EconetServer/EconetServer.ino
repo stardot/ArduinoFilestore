@@ -267,7 +267,7 @@ void setup() {
   int config_Station_Temp=readConfigValueAsInt("Station");;
   if (config_Station_Temp < 2 || config_Station_Temp > 254) {
     Serial.println("Station number invalid, using "+String(config_Station)+" instead");
-    writeConfigValue("Station",(String)config_Station);
+    writeConfigValue("Station",""); // Wipe current invalid config setting
   } else {
     config_Station=(byte)config_Station_Temp;
   }
@@ -277,7 +277,7 @@ void setup() {
   config_FSName=readConfigValue("FSName");
   if (config_FSName.length()==0 || config_FSName.length()>16) {
     config_FSName="Arduino"+String(config_Station);
-    writeConfigValue("FSName",config_FSName);
+    writeConfigValue("FSName",""); // Wipe current invalid config setting
   }   
 
   Serial.println("Disc name is "+String(config_FSName)+".");
@@ -291,6 +291,7 @@ void setup() {
     Serial.println("Invalid ethernet MAC address configured, "); 
     mac[2] = 0xa4; // 00:00:A4 = Acorn MAC address allocation
     mac[5] = config_Station;
+    writeConfigValue("MAC",""); // Wipe current invalid config setting
   } 
   Serial.println ("Using ethernet MAC address "+String(mac[0],HEX)+":"+String(mac[1],HEX)+":"+String(mac[2],HEX)+":"+String(mac[3],HEX)+":"+String(mac[4],HEX)+":"+String(mac[5],HEX));
 
@@ -300,7 +301,8 @@ void setup() {
   sscanf(confBuff, "%u.%u.%u.%u", ip, ip + 1, ip + 2, ip + 3);
   
   if (ip[0]+ip[1]+ip[2]+ip[3] == 0) {
-    Serial.println("Invalid IP address configured, using DHCP to get IP..."); 
+    Serial.println("Invalid IP address configured, using DHCP to get IP...");
+    writeConfigValue("IP",""); // Wipe current invalid config setting 
     etherSelect();
     Ethernet.begin(mac); 
   }  else {
@@ -315,6 +317,7 @@ void setup() {
        mask[0]=255;
        mask[1]=255;
        mask[2]=255;
+       writeConfigValue("Netmask","255.255.255.0"); 
     }
  
     byte dns[] = {0, 0, 0, 0};
@@ -328,12 +331,18 @@ void setup() {
        dns[1]=8;
        dns[2]=8;
        dns[3]=8;
+       writeConfigValue("DNS","8.8.8.8");
     }
 
     byte gateway[] = {0, 0, 0, 0};
     config_Gateway=readConfigValue("Gateway");
     config_Gateway.toCharArray(confBuff,16);  
     sscanf(confBuff, "%u.%u.%u.%u", gateway, gateway + 1, gateway + 2, gateway + 3);
+
+    if (gateway[0]+gateway[1]+gateway[2]+gateway[3] == 0) {
+       Serial.println("Netmask not set, using 255.255.255.0");    
+       writeConfigValue("Gateway","0.0.0.0"); 
+    }
       
     etherSelect();
     Ethernet.begin(mac,ip,dns,gateway,mask); 
@@ -348,7 +357,8 @@ void setup() {
   sscanf(confBuff, "%u.%u.%u.%u", ntpserver, ntpserver + 1, ntpserver + 2, ntpserver + 3);
   
   if (ntpserver[0]+ntpserver[1]+ntpserver[2]+ntpserver[3] == 0) {
-    Serial.print("NTP server not configured, skipping clock sync");    
+    Serial.print("NTP server not configured, skipping clock sync");
+    writeConfigValue("NTP","0.0.0.0");    
   } else {
 
     timeServer[0]=ntpserver[0];
