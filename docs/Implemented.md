@@ -13,7 +13,7 @@ Here is an overview of which NetFS operations are currently working
 |:heavy_check_mark: |  |	*I am user_name [password]| Sometimes confuses FS number with userid|
 | :heavy_check_mark: | |	*Info object_spec| |
 |:heavy_check_mark: |  |	*Lib [directory]| |
-| |  |	*Logon user_name [password]| |
+|:heavy_check_mark: |  |	*Logon user_name [password]| Same issue as *I AM|
 |:heavy_check_mark: |  |	*Pass old_password new_password| |
 | :heavy_check_mark:|  |	*Rename object new_name| |
 | :heavy_check_mark:|  |	*SDisc [:]disc_spec| |
@@ -28,7 +28,7 @@ Here is an overview of which NetFS operations are currently working
 | :heavy_check_mark:|  |	*FSConfigure| |
 | :heavy_check_mark: |1|	Save file| |
 | :heavy_check_mark: |2|	Load file| |
-| :heavy_check_mark: |3|	Examine| Does not support return format 1|
+| :heavy_check_mark: |3|	Examine||
 | |4|	Catalogue header| |
 |:heavy_check_mark: |5|	Load as| |
 |:heavy_check_mark: |6|	Open object| |
