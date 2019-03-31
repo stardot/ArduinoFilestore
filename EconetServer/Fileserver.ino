@@ -46,6 +46,8 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("FSREBOOT")) fsShutdown(replyPort, true);
       else if (param1C.startsWith("BYE")) fsBye(replyPort);  
       else if (param1C.startsWith("CDIR")) fsCdir(replyPort,true);   
+      else if (param1C.startsWith("INFO")) fsInfo(replyPort,false);   
+      else if (param1C.startsWith("I.")) fsInfo(replyPort,true); 
       // Unimplemented commands are:
       // ACCESS
       // INFO
@@ -564,6 +566,216 @@ void fsRename(byte txPort, int bytesRx) {
   txBuff[5] = 0; // Is successful
 
   if (txWithHandshake(6, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
+}
+
+void fsInfo(byte txPort, boolean abbreviated) {
+  SdFile file;
+  dir_t dirEntry;
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  String workingDir;
+
+  workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
+
+  String object;
+ 
+  if (abbreviated){  object = getStringFromRX(11, DIRENTRYSIZE); } else { object = getStringFromRX(14, DIRENTRYSIZE); };
+
+  Serial.print(" User: ");
+  Serial.print(usrHdl);
+  Serial.print(" Filename: ");
+  String fatPath = convertToFATPath(object, workingDir, txPort);
+  Serial.print(fatPath);
+
+  if (!hasUserAccess(usrHdl,fatPath,true)){
+    // User does not have write access to object
+    fsError(0xBD,"Insufficient Access",txPort);
+    return; 
+  }  
+
+  fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  if (!sd.exists(pathBuff1)) {
+    //Object not found - send error and leave
+    fsError(0xD6, "Not Found", txPort);
+    return;
+  }
+  //work out if it's a file or directory, as info is different
+
+  boolean isDir = false;
+
+  if (!file.open(pathBuff1, O_READ)) {
+    // File failed to open for examination, can't continue
+    fsError(0xFF, "Server internal error", txPort);
+    return;
+  }
+  file.getName(pathBuff4, DIRENTRYSIZE);
+  file.dirEntry(&dirEntry);
+
+  unsigned int fileAddress = dirEntry.firstClusterLow;
+  bool directory = file.isDir();
+  unsigned int fileSize = file.fileSize();
+  unsigned long execAddress = getExecAddressForObject(pathBuff1);
+  unsigned long loadAddress = getLoadAddressForObject(pathBuff1);
+  byte fileAttr = getAttributes(pathBuff1);
+  int fsDate = getEconetDate(&dirEntry);
+  String fcName=pathBuff4;
+  fcName.replace(".","/");
+  String text="";
+  int padding=0;
+
+  file.close();
+
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = rxBuff[0];
+  txBuff[3] = rxBuff[1];
+  txBuff[4] = 4; // Command code
+  txBuff[5] = 0; // Is successful
+
+  int bufpos=6;
+
+  //Send name first
+  writeStringtoTX(fcName, bufpos, 10);    //TODO: If root send $
+  bufpos += 10;
+  txBuff[bufpos] = 32;
+  bufpos++;
+
+  // Load address
+  text=String(loadAddress,HEX);
+
+  while (text.length() < 8){
+    // Pad address if short
+    text="0"+text;
+  }
+
+  text.toUpperCase();
+
+  writeStringtoTX(text, bufpos, 8);    //TODO: If root send $
+  bufpos += 8;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  
+  // Exec address
+  text=String(execAddress,HEX);
+
+  while (text.length() < 8){
+    // Pad address if short
+    text="0"+text;
+  }
+
+  text.toUpperCase();
+
+  writeStringtoTX(text, bufpos, 8);  
+  bufpos += 8;
+  txBuff[bufpos] = 32;
+  bufpos++;
+
+  
+  // Length
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+
+  text=String(fileSize,HEX);
+
+  while (text.length() < 6){
+    // Pad address if short
+    text="0"+text;
+  }
+
+  text.toUpperCase();
+
+  writeStringtoTX(text, bufpos, 6);   
+  bufpos += 6;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  
+  // 7 characters access attributes
+  padding = 0;
+  if ((fileAttr & 64) || (fileAttr & 16)) {
+    txBuff[bufpos] = 76;
+    bufpos ++;
+  } else padding++; // Locked
+  if (fileAttr & 32) {
+    txBuff[bufpos] = 68;
+    bufpos ++;
+  } else padding++; // Directory
+  if (fileAttr & 8) {
+    txBuff[bufpos] = 87;
+    bufpos ++;
+  } else padding++; // Owner W
+  if (fileAttr & 4) {
+    txBuff[bufpos] = 82;
+    bufpos ++;
+  } else padding++; // Owner R
+  txBuff[bufpos] = 47; // / seperator
+  bufpos++;
+  if (fileAttr & 2) {
+    txBuff[bufpos] = 119;
+    bufpos ++;
+  } else padding++; // Public w
+  if (fileAttr & 1) {
+    txBuff[bufpos] = 114;
+    bufpos ++;
+  } else padding++; // Public r
+
+  while (padding > 0) {
+    txBuff[bufpos] = 32;
+    bufpos++;
+    padding--;
+  }
+
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+  txBuff[bufpos] = 32;
+  bufpos++;
+
+  // Econet date
+  text=econetDateToString(fsDate);
+  writeStringtoTX(text, bufpos, 8); 
+  bufpos += 8;
+  txBuff[bufpos] = 32;
+  bufpos++;
+
+
+  // System Internal Numbner
+  text=String(fileAddress,HEX);
+
+  while (text.length() < 6){
+    // Pad address if short
+    text="0"+text;
+  }
+
+  text.toUpperCase();
+
+  writeStringtoTX(text, bufpos, 6);   
+  bufpos += 6;
+ 
+  // Terminator
+  txBuff[bufpos] = 0x0d;
+  bufpos ++;
+  txBuff[bufpos] = 0x80;
+  bufpos ++;
+    
+  if (txWithHandshake(bufpos, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
 
 }
 
@@ -1658,14 +1870,14 @@ void fsExamine(int txPort) {
 
         // Load address
         text=String(loadAddress,HEX);
-
+      
         while (text.length() < 8){
           // Pad address if short
           text="0"+text;
         }
-
+      
         text.toUpperCase();
-
+      
         writeStringtoTX(text, bufpos, 8);    //TODO: If root send $
         bufpos += 8;
         txBuff[bufpos] = 32;
@@ -1673,36 +1885,46 @@ void fsExamine(int txPort) {
         
         // Exec address
         text=String(execAddress,HEX);
-
+      
         while (text.length() < 8){
           // Pad address if short
           text="0"+text;
         }
-
+      
         text.toUpperCase();
-
+      
         writeStringtoTX(text, bufpos, 8);  
         bufpos += 8;
         txBuff[bufpos] = 32;
         bufpos++;
+      
         
         // Length
+        txBuff[bufpos] = 32;
+        bufpos++;
+        txBuff[bufpos] = 32;
+        bufpos++;
+      
         text=String(fileSize,HEX);
-
-        while (text.length() < 8){
+      
+        while (text.length() < 6){
           // Pad address if short
           text="0"+text;
         }
-
+      
         text.toUpperCase();
-
-        writeStringtoTX(text, bufpos, 8);   
-        bufpos += 8;
+      
+        writeStringtoTX(text, bufpos, 6);   
+        bufpos += 6;
         txBuff[bufpos] = 32;
         bufpos++;
-
-        // 7 characters access attributes - padded out to 8 characters
-        padding = 1;
+        txBuff[bufpos] = 32;
+        bufpos++;
+        txBuff[bufpos] = 32;
+        bufpos++;
+      
+        // 7 characters access attributes
+        padding = 0;
         if ((fileAttr & 64) || (fileAttr & 16)) {
           txBuff[bufpos] = 76;
           bufpos ++;
@@ -1729,37 +1951,46 @@ void fsExamine(int txPort) {
           txBuff[bufpos] = 114;
           bufpos ++;
         } else padding++; // Public r
-
+      
         while (padding > 0) {
           txBuff[bufpos] = 32;
           bufpos++;
           padding--;
         }
-
+      
+        txBuff[bufpos] = 32;
+        bufpos++;
+        txBuff[bufpos] = 32;
+        bufpos++;
+        txBuff[bufpos] = 32;
+        bufpos++;
+        txBuff[bufpos] = 32;
+        bufpos++;
+      
         // Econet date
         text=econetDateToString(fsDate);
         writeStringtoTX(text, bufpos, 8); 
         bufpos += 8;
         txBuff[bufpos] = 32;
         bufpos++;
-
-
+      
+      
         // System Internal Numbner
         text=String(fileAddress,HEX);
-
+      
         while (text.length() < 6){
           // Pad address if short
           text="0"+text;
         }
-
+      
         text.toUpperCase();
-
-        writeStringtoTX(text, bufpos, 8);   
-        bufpos += 8;
-       
+      
+        writeStringtoTX(text, bufpos, 6);   
+        bufpos += 6;
+     
         // Terminator
         txBuff[bufpos] = 0;
-        bufpos++;
+        bufpos ++;
         break;
         
       case 2:
@@ -3969,19 +4200,24 @@ int getEconetDate(dir_t* dirEntry) {
 }
 
 String econetDateToString(int ecoDate){
-  int mnthday=(ecoDate & 31);
-  int mnth = (ecoDate & 3840)>>8;
-  int yr=ecoDate>>12;
-  yr+=(ecoDate &224)>1;
-  yr+=1981;
-  String ds=(String)mnthday;
-  if (ds.length()==1) ds="0"+ds; // Make day 2 digits if necessary
-  String ms=(String)mnth;
-  if (ms.length()==1) ms="0"+ms; // Make month 2 digits if necessary
-  String yrs=(String)yr;
-  yrs=yrs.substring(yrs.length()-2); // reduce year to 2 digits
-  String result=ds+"/"+ms+"/"+yrs;
 
+  String result="01/01/81"; // Set to Econet epoch, returned if passed invalid date
+  
+  if (ecoDate>0){
+    int mnthday=(ecoDate & 31);
+    int mnth = (ecoDate & 3840)>>8;
+    int yr=ecoDate>>12;
+    yr+=(ecoDate &224)>1;
+    yr+=1981;
+    String ds=(String)mnthday;
+    if (ds.length()==1) ds="0"+ds; // Make day 2 digits if necessary
+    String ms=(String)mnth;
+    if (ms.length()==1) ms="0"+ms; // Make month 2 digits if necessary
+    String yrs=(String)yr;
+    yrs=yrs.substring(yrs.length()-2); // reduce year to 2 digits
+    result=ds+"/"+ms+"/"+yrs;
+  }
+  
   return(result);
 }
 
