@@ -38,11 +38,13 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define PROFILE_URD 34
 
 // Protocol retries and timeouts set here!
-#define SCOUTTIMEOUT 100 // Milliseconds to wait for scout during RX
+#define SCOUTTIMEOUT 100 // Milliseconds to wait for seocnd part of scout during RX 3 
+#define ACKTIMEOUT 200 // mS to wait for scout or payload ack to arrive during TX
+
 #define TXBEGINTIMEOUT 5000 // Milliseconds to wait for network to become ready to TX frame before reporting line jammed
+
 #define TXRETRIES 5 // Number of times to retry a failed frame TX before reporting failed
-#define TXRETRYDELAY 200 //mS to wait between frame retries
-#define ACKTIMEOUT 100 // mS to wait for ack to arrive during TX
+#define TXRETRYDELAY 200 //mS to wait between frame retries 100
 
 #define BUFFSIZE 16384 // Size of TX, RX and work buffers
 #define MAXUSERS 10 // Total number of user sessions
