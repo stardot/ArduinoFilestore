@@ -328,7 +328,7 @@ void fsLogin(byte txPort, String command, int bytesRX) {
 
   // Check if station has an existing user handle
   if (fsGetUserHdl(rxBuff[3], rxBuff[2]) != -1) {
-    Serial.print(F(" - Station already logged in, clearing existing connection"));
+    Serial.println(F(" - Station already logged in, clearing existing connection"));
     fsLogoff(rxBuff[3], rxBuff[2]);
   }
 
@@ -2780,7 +2780,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     //fSequence[fileHandle]=rxControlByte & 1;
   }
 
-  // delay(100); // Some clients don't like you answering too quickly!
+  // delay(3); // Some clients don't like you answering too quickly!
 
   if (gotBytes[fileHandle] != expectingBytes[fileHandle]) {
     // Not all bytes received yet, send ack.
@@ -2791,7 +2791,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     txBuff[4] = 0x00; // Any byte can be sent as the ack
 
     if (!txWithHandshake(5, ackPort, rxControlByte)) {
-      Serial.println(F("Client failed to acknowledge during bulk transfer"));
+      Serial.println(F("Bulk transfer ack failed"));
       // Clear out the ADLC before returning
       readFIFO();
       resetIRQ();
@@ -2807,6 +2807,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     }
 
     // Transfer complete, send final reply
+    //delay(3); // Some clients don't like you answering too quickly!
+
     if (isSave[fileHandle]) {
       // File is open for saving, close file and send ack
 
