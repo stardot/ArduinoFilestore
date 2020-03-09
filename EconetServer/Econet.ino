@@ -1,4 +1,3 @@
-
 void rxFrame(){
   int ptr=0;
   byte stat=0;
@@ -18,21 +17,20 @@ void rxFrame(){
       return;
   }
   
-  ptr++;
+  ptr=1;
 
-  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("Scout timeout");} ;
+  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("S!");} ;
 
   while (frame){     
    // Now check the status register
  
     do {
-      delayMicroseconds(1); // Even at the fastest clock rate, it still takes several uS to get another byte.      
       stat=readSR2();
     } while (!(stat & 250)); // While no errors, or available data - keep polling  
 
     rxBuff[ptr]=readFIFO();
     if (ptr < BUFFSIZE) {ptr++;}; //TODO: keep overwriting last byte for now until I do this properly and abort the rx!
-
+    
     if (stat & 122 ) frame=false; // If error or end of frame bits set, drop out
   } // End of while in frame - Data Available with no error bits or end set
  
@@ -97,7 +95,7 @@ void rxFrame(){
     printSR2(stat);
     Serial.println("");
 
-    displayBuffer(ptr);
+    displayRXBuffer(ptr);
 
     // Reset the RXStatus bit
     delayMicroseconds(1);  
@@ -152,7 +150,7 @@ void processFrame (int bytes){
   Serial.println (" ");
 }
 
-void displayBuffer(int lastbyte){
+void displayRXBuffer(int lastbyte){
     Serial.print (lastbyte);
     Serial.print (" bytes in buffer");
     Serial.println (); 
@@ -172,12 +170,13 @@ void ackRX(){
   txBuff[2]=rxBuff[0];
   txBuff[3]=rxBuff[1];
   
-  txFrame(4);  // And transmit it
+  txFrame(4,false,false,false);  // And transmit it
 
   return;
 }
 
 void rxBroadcast (int bytes){
+  if (bytes<6) return; // Spurious zero frame
   int controlByte=rxBuff[4];
   int rxPort=rxBuff[5];
   printTime();
@@ -293,9 +292,8 @@ void doImmediateOpRX(int rxSize){
       txBuff[5]=0x00;
       txBuff[6]=0x02;
       txBuff[7]=0x00;
-      Serial.print (" - Replying Filestore V2.00 ");
       
-      if (txFrame(8)) { Serial.println ("Done!"); } else { Serial.println ("Failed!"); };
+      if (txFrame(8,false,false,true)) { Serial.println (" - Replied Filestore V2.00!"); } else { Serial.println (" - Reply failed!"); };
       
       break;
       
@@ -306,117 +304,48 @@ void doImmediateOpRX(int rxSize){
   return;
 }
 
-boolean txFrame(int bytes){
-  int sr1,sr2;
-  unsigned long timeOut;
-  
-  writeCR1(B00000000); // Disable RX interrupts, select address 1
-
-  timeOut=millis()+TXBEGINTIMEOUT;
-  sr1=readSR1();
-  
-  while(!(sr1 & 64)){ // If we don't have TDRA, clear status until we do!  
-    writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
-    delayMicroseconds(1);
-    sr1=readSR1();
-  }
-
-  digitalWriteDirect(PIN_LED,1);
-
-  delayMicroseconds(10); // Give the other clients a moment to notice the flag fill 
- 
-  for(int buffPtr=0;buffPtr<bytes;buffPtr+=1){
-    sr1=readSR1();
-    if (sr1 & 2) sr2=readSR2();    
-    while(true){ // While not TDRA set, loop until it is - or we get an error
-      if (sr1 & 64) break;
-      if (sr1 & 32) {Serial.print ("TX Underrun at "); Serial.println (buffPtr); resetIRQ(); return(false);};
-      if (!sr1 & 16) {Serial.println ("CTS loss"); resetIRQ(); return(false);};
-      //delayMicroseconds(1);
-      if (millis()>timeOut){Serial.print("TX timeout on byte "); Serial.print(buffPtr); resetIRQ(); return(false);}
-      sr1=readSR1();
-      if (sr1 & 2) sr2=readSR2();       
-    }
-
-  digitalWriteDirect(PIN_LED,0);
-  
-    // Now we are ready, write the byte.
-    writeFIFO(txBuff[buffPtr]);
-  } // End of for loop to tx bytes
-
-  writeCR2(B00010001); // Tell the ADLC that was the last byte, and clear flag fill modes and RTS.
-  
-  // Do a last check for errors
-  sr1=readSR1();
-
-  if ((sr1 & 2) || (sr1 & 32) || (!sr1 &16)){
-    if (sr1 & 2) sr2=readSR2();    
-    if (sr1 & 32){ 
-      //TX underrun
-      Serial.println("TX underrun");
-      initADLC(); //reset the ADLC
-      return (false);
-    }
-    if (!sr1 & 16){ 
-      //CTS loss
-      Serial.println("CTS loss");
-      initADLC(); //reset the ADLC
-      return (false);
-    }          
-  }
-  writeCR1(B00000010); //Enable RX interrupts, select address 1
-  return (true);
+void rxReset(){
+  delayMicroseconds(2); // Give the last byte a moment to drain
+  writeCR2(B00100001); // Clear RX status, prioritise status 
 }
 
-boolean txScoutFrame(){
-  int sr1,sr2;
-  sr1=readSR1();
-//  digitalWriteDirect(PIN_LED,1);
-  while(!(sr1 & 64)){ // If we don't have TDRA, clear status until we do!  
-    writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
-    delayMicroseconds(1);
-    sr1=readSR1();
+boolean txWithHandshake(int lastByte, int port, int controlByte){
+  int attempt=0;
+  while (attempt<TXRETRIES){
+    if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
+    attempt++;
+    Serial.print("R!");
+    delay(TXRETRYDELAY);
   }
-//  digitalWriteDirect(PIN_LED,0);
+  return(false);
+}
+
+boolean txWithHandshakeInner(int lastByte, int port, int controlByte){
+  //First generate the scout  
+  scoutBuff[0]=txBuff[0];
+  scoutBuff[1]=txBuff[1];
+  scoutBuff[2]=txBuff[2];
+  scoutBuff[3]=txBuff[3];
+  scoutBuff[4]=controlByte;
+  scoutBuff[5]=port;
+
+  // Wait for network to become idle, or bail out if network error
+  if (!waitIdle()) { Serial.println("Line Jammed"); return(false);};
+
+  // Send the scout (waitforack=true, scout=true, immediate=false)
+  if (!txFrame(6,true,true,false)) { 
+    Serial.print("S!"); 
+    return(false); 
+  } 
+
+//  if (!waitForAck()) {return(false);};
   
-  for(int buffPtr=0;buffPtr!=6;buffPtr+=1){
-    sr1=readSR1();
-    if (sr1 & 2) sr2=readSR2();    
-    while(true){ // While not TDRA set, loop until it is - or we get an error
-      if (sr1 & 64) break;
-      if (sr1 & 32) {Serial.print ("TX Underrun at "); Serial.println (buffPtr); return(false);};
-      if (!sr1 & 16) {Serial.println ("CTS loss"); return(false);};
-      //delayMicroseconds(1);
-      sr1=readSR1();
-      if (sr1 & 2) sr2=readSR2();       
-    }
+  // Now send the payload data (waitforack=true, scout=false, immediate=false)
+  if (!txFrame(lastByte,true,false,false)) return(false);
 
-
-    // Now we are ready, write the byte.
-    writeFIFO(scoutBuff[buffPtr]);
-  } // End of for loop to tx bytes
-
-  writeCR2(B00010001); // Tell the ADLC that was the last byte, and clear flag fill modes and RTS.
-  
-  // Do a last check for errors
-  sr1=readSR1();
-
-  if ((sr1 & 2) || (sr1 & 32) || (!sr1 &16)){
-    if (sr1 & 2) sr2=readSR2();    
-    if (sr1 & 32){ 
-      //TX underrun
-      Serial.println("TX underrun");
-      initADLC(); //reset the ADLC
-      return (false);
-    }
-    if (!sr1 & 16){ 
-      //CTS loss
-      Serial.println("CTS loss");
-      initADLC(); //reset the ADLC
-      return (false);
-    }          
-  }
-  return (true);
+//  if (!waitForAck()) {return(false);};
+    
+  return(true);
 }
 
 boolean waitIdle(){
@@ -456,47 +385,65 @@ boolean waitIdle(){
   
 }
 
-boolean txWithHandshake(int lastByte, int port, int controlByte){
-  int attempt=0;
-  while (attempt<TXRETRIES){
-    if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
-    attempt++;
-    delay(TXRETRYDELAY);
+boolean txFrame(int bytes, boolean getAck, boolean scout, boolean immediate){
+  int sr1,sr2;
+  unsigned long timeOut;
+  boolean ackResult=false, done=false;
+  
+  writeCR1(B00000000); // Disable RX interrupts
+
+  timeOut=millis()+TXBEGINTIMEOUT;
+  
+  while(!(readSR1() & 64)){ // If we don't have TDRA, clear status until we do!  
+    writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
   }
-  return(false);
+
+  delayMicroseconds(10); // Give the other clients a moment to notice the flag fill 
+ 
+  for(int buffPtr=0;buffPtr<bytes;buffPtr+=1){
+   
+    while(true){ // While not TDRA set, loop until it is - or we get an error
+      sr1=readSR1();
+      if (sr1 & 64) break; // We have TDRA
+      if (sr1 & 192) { // Some other error
+        printSR1(sr1); 
+        resetIRQ(); 
+        return(false);
+        };
+      if (millis()>timeOut){Serial.print("TX timeout on frame "); Serial.print(buffPtr); resetIRQ(); return(false);}
+    }
+  
+    // Now we are ready, write the byte.
+    if (scout) writeFIFO(scoutBuff[buffPtr]); else writeFIFO(txBuff[buffPtr]);
+    
+  } // End of for loop to tx bytes
+
+  writeCR2(B00111001); // Tell the ADLC that was the last byte, and clear flag fill modes and RTS. 
+  writeCR1(B00000100); // Tx interrupt enable
+  
+ // Do a last check for errors
+ while (digitalReadDirect(PIN_IRQ)){}; // Wait for IRQ
+ 
+ sr1=readSR1();
+ if (!sr1 & 64){ // Something other than Frame complete happened
+   printSR1(sr1);
+   resetIRQ();
+   return(false);                
+ }
+ 
+  writeCR2(B01100001); //Clear any pending status, prioritise status
+  writeCR1(B00000010); //Suppress tx interrupts, Enable RX interrupts
+
+  //  return(true);
+
+  if (!getAck) return (true); // If ack not expected,  return now
+
+  if (waitForAck()) return(true);
+  return (false);
 }
 
-boolean txWithHandshakeInner(int lastByte, int port, int controlByte){
-  int sr1,sr2;
-  //First generate the scout
-  
-  scoutBuff[0]=txBuff[0];
-  scoutBuff[1]=txBuff[1];
-  scoutBuff[2]=txBuff[2];
-  scoutBuff[3]=txBuff[3];
-  scoutBuff[4]=controlByte;
-  scoutBuff[5]=port;
-  digitalWriteDirect(PIN_LED,0);
-  // Wait for network to become idle, or bail out if network error
-  if (!waitIdle()) return(false);
-
-  if (!txScoutFrame()) {resetIRQ(); return(false);};
-
-
-  // Scout sent, listen for ack
-  if (!waitForAck()) {return(false);};
-  
-  digitalWriteDirect(PIN_LED,0);
-  // Now send the payload
-  if (!txFrame(lastByte)) {resetIRQ(); return(false);};
- 
-  // And wait for acknowledgement
-  if (!waitForAck()) {return(false);};
-
-//  digitalWriteDirect(PIN_LED,0);
-//  resetIRQ(); // Just in case we bailed out somewhere leaving interrupts disabled
-  
-  return(true);
+void flagFill(){
+  writeCR2(B11100100); // Set CR2 to RTS, TX Status Clear, RX Status clear, Flag fill on idle)
 }
 
 boolean waitForAck(){
@@ -586,15 +533,6 @@ boolean checkAck(){
   return (false);   // Not bothering with any other error checking - if we are here the frame is wrong regardless of cause.
 }
 
-void flagFill(){
-  writeCR2(B11100100); // Set CR2 to RTS, TX Status Clear, RX Status clear, Flag fill on idle)
-}
-
-void rxReset(){
-  delayMicroseconds(2); // Give the last byte a moment to drain
-  writeCR2(B00100001); // Clear RX status, prioritise status 
-}
-
 void listFS(){
   txBuff[0]=0xFF; 
   txBuff[1]=0xFF;
@@ -611,7 +549,7 @@ void listFS(){
   txBuff[12]=0x04;
   txBuff[13]=0x00;
 
-  if (!txFrame(14)){ Serial.println(F("Failed to send ListFS"));};
+  if (!txFrame(14,false,false,false)){ Serial.println(F("Failed to send ListFS"));};
 }
 
 void bridgeProbe(){
@@ -630,5 +568,5 @@ void bridgeProbe(){
   txBuff[12]=0x9C;
   txBuff[13]=0x00;
 
-  if (!txFrame(14)){ Serial.println(F("Failed to send bridge discovery broadcast"));};
+  if (!txFrame(14,false,false,false)){ Serial.println(F("Failed to send bridge discovery broadcast"));};
 }
