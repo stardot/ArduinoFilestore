@@ -2,7 +2,7 @@ void rxFrame(){
   int ptr=0;
   byte stat=0;
   boolean frame=true;
-  static boolean gotScout=false; // This maintains our state in the 4 way handshake between calls.
+//  static boolean gotScout=false; // This maintains our state in the 4 way handshake between calls.
   static unsigned long scoutTimeout=0;
   
 
@@ -19,7 +19,7 @@ void rxFrame(){
   
   ptr=1;
 
-  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("S!");} ;
+  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("rS!");} ;
 
   while (frame){     
    // Now check the status register
@@ -58,21 +58,22 @@ void rxFrame(){
       } else {
         // Acknowledge the scout, and set flag for next run
         
-        // TODO: I really only should acknowledge if I'm expecting a frame by checking these....  
-        // rxBuff[3] = Sender station
-        // rxBuff[4] = Sender network
-        // rxBuff[5] = ControlByte
-        // rxBuff[6] = Port
+        // rxBuff[2] = Sender station
+        // rxBuff[3] = Sender network
+        // rxBuff[4] = ControlByte
+        // rxBuff[5] = Port
         
-        // ... but I'm not for the moment!
-  
+        // I'm only interested in port 0x99 (FS protocol), and any bulk transfer ports open
+        
         // Make a note of these, as we won't get them again in the payload
         rxControlByte=rxBuff[4];
         rxPort=rxBuff[5];
-      
-        ackRX();
-        gotScout=true;
-        scoutTimeout=millis()+SCOUTTIMEOUT;
+
+        if (rxPort==0x99 || fHandleActive[rxPort-129]){ 
+          ackRX();
+          gotScout=true;
+          scoutTimeout=millis()+SCOUTTIMEOUT;
+        }
       }
      
     } else {
@@ -80,7 +81,7 @@ void rxFrame(){
         // Have got a payload after the scout, acknowledge and process
         ackRX();
         gotScout=false;
-        if (rxPort==0x99) { fsOperation(ptr); } else { processFrame(ptr); };
+        if (rxPort==0x99) { fsOperation(ptr); } else { fsBulkRXArrived(rxPort,ptr); };
 
     }
     
@@ -95,13 +96,13 @@ void rxFrame(){
     printSR2(stat);
     Serial.println("");
 
-    displayRXBuffer(ptr);
-
     // Reset the RXStatus bit
     delayMicroseconds(1);  
     rxReset();
     gotScout=false;
-  
+/*
+    displayRXBuffer(ptr);
+ 
     //Recheck status
     delayMicroseconds(2);
     Serial.print ("SR1 =");
@@ -112,9 +113,11 @@ void rxFrame(){
     stat=readSR2();
     printSR2(stat);
     Serial.println ("");
+
+*/  
   }  
 }
-
+/*
 void processFrame (int bytes){
   // Not an FS command, but could be a bulk data transfer
   
@@ -150,6 +153,7 @@ void processFrame (int bytes){
   Serial.println (" ");
 }
 
+
 void displayRXBuffer(int lastbyte){
     Serial.print (lastbyte);
     Serial.print (" bytes in buffer");
@@ -160,7 +164,7 @@ void displayRXBuffer(int lastbyte){
     } 
     Serial.println (" ");
 }
-
+*/
 void ackRX(){
   // Generate an acknowledgement packet 
   
@@ -311,7 +315,7 @@ void rxReset(){
 
 boolean txWithHandshake(int lastByte, int port, int controlByte){
   int attempt=0;
-  while (attempt<TXRETRIES){
+  while (attempt<TXRETRIES){    
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
     Serial.print("R!");

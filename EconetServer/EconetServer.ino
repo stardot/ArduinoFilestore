@@ -91,6 +91,7 @@ boolean busWrite = false; // Global flag to indicate data bus direction
 
 byte rxPort = 255;
 byte rxControlByte=255;
+boolean gotScout=false;
 
 // Reserve space for server tables
 char userURD[DIRENTRYSIZE*MAXUSERS];
@@ -420,7 +421,8 @@ void loop() {
   listFS();
   busReadMode();
 
-  Serial.println("\n-------------------------------\nEntering main loop");
+//  Serial.println("\n-------------------------------\nEntering main loop");
+    Serial.println("\n------\nEntering main loop");
 
   while (1){ // Enter main event loop
 
@@ -434,7 +436,7 @@ void loop() {
 
         if (statReg2 & 1) { rxFrame(); };               // Address present in FIFO, so fetch it and the rest of frame
         if (statReg2 & 2 ) { readFIFO(); resetIRQ(); }; // Frame complete - not expecting a frame here, so read and discard 
-        if (statReg2 & 4 ) { resetIRQ(); };             // Inactive idle - clear it quietly
+        if (statReg2 & 4 ) { resetIRQ(); gotScout=false; };  // Inactive idle - clear open rx
         if (statReg2 & 8 ) { resetIRQ(); };             // TX abort received - not inside a frame here, so clear it 
         if (statReg2 & 16 ) { resetIRQ(); };            // Frame error - not inside a frame here, so clear it 
         if (statReg2 & 32) { Serial.println("No clock!"); resetIRQ(); }; // Carrier loss
