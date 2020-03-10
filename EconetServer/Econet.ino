@@ -99,72 +99,10 @@ void rxFrame(){
     // Reset the RXStatus bit
     delayMicroseconds(1);  
     rxReset();
-    gotScout=false;
-/*
-    displayRXBuffer(ptr);
- 
-    //Recheck status
-    delayMicroseconds(2);
-    Serial.print ("SR1 =");
-    stat=readSR1();
-    printSR1(stat);
-    delayMicroseconds(1);
-    Serial.print ("  SR2 =");
-    stat=readSR2();
-    printSR2(stat);
-    Serial.println ("");
-
-*/  
+    gotScout=false; 
   }  
 }
-/*
-void processFrame (int bytes){
-  // Not an FS command, but could be a bulk data transfer
-  
-  if (fHandleActive[rxPort-129]) {
-     fsBulkRXArrived(rxPort, bytes);
-     return;  
-  }
-  
-  Serial.print ("Unexpected frame of ");
-  Serial.print (bytes);  
-  Serial.print (" bytes from ");
-  Serial.print (rxBuff[3]);
-  Serial.print (".");
-  Serial.print (rxBuff[2]);
-  Serial.print (", control byte = ");
-  Serial.print (rxControlByte,HEX);
-  Serial.print (", port = ");
-  Serial.print (rxPort,HEX);
-  Serial.println("."); 
 
-  for (int ptr1=4; ptr1 < bytes ; ptr1++){
-    Serial.print (rxBuff[ptr1],HEX);
-    Serial.print (" ");
-  }
-  Serial.print ("= ");
-  for (int ptr1=4; ptr1 < bytes ; ptr1++){
-    if (rxBuff[ptr1]<32 || rxBuff[ptr1]> 126){
-      Serial.print (".");
-    } else {
-      Serial.write (rxBuff[ptr1]);
-    }
-  } 
-  Serial.println (" ");
-}
-
-
-void displayRXBuffer(int lastbyte){
-    Serial.print (lastbyte);
-    Serial.print (" bytes in buffer");
-    Serial.println (); 
-    for (int ptr1=0; ptr1 < lastbyte ; ptr1++){
-      Serial.print (rxBuff[ptr1],HEX);
-      Serial.print (" ");
-    } 
-    Serial.println (" ");
-}
-*/
 void ackRX(){
   // Generate an acknowledgement packet 
   
