@@ -72,11 +72,9 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
                     // Econet module pin 16 gnd
                     // Econet module pin 17 +5v
 
-
 #define SD_SPI_PIN 4
 #define ETHER_SPI_PIN 10
 #define SPI_SPEED SD_SCK_MHZ(24) // TODO: Need to fine tune this
-
 
 byte rxBuff[BUFFSIZE];
 byte txBuff[BUFFSIZE];
