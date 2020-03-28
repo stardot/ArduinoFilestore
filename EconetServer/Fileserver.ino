@@ -261,7 +261,7 @@ void fsLogin(byte txPort, String command, int bytesRX) {
 
   String user = getStringFromRX(14, 21);
   String pass = "";
-  if (bytesRX > 13 + user.length()) pass = getStringFromRX(15 + user.length(), 22); // Only look for a password if submitted - TODO: need to take into account optional station number
+  if (bytesRX > 15 + user.length()) pass = getStringFromRX(15 + user.length(), 22); // Only look for a password if submitted
   if (pass == "\"\"") pass = ""; // Fix blank password submitted
 
   user.toUpperCase();
