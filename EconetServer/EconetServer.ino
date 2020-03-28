@@ -270,7 +270,6 @@ void setup() {
   int config_Station_Temp=readConfigValueAsInt("Station");;
   if (config_Station_Temp < 2 || config_Station_Temp > 254) {
     Serial.println("Station number invalid, using "+String(config_Station)+" instead");
-    writeConfigValue("Station",""); // Wipe current invalid config setting
   } else {
     config_Station=(byte)config_Station_Temp;
   }
@@ -280,7 +279,6 @@ void setup() {
   config_FSName=readConfigValue("FSName");
   if (config_FSName.length()==0 || config_FSName.length()>16) {
     config_FSName="Arduino"+String(config_Station);
-    writeConfigValue("FSName",""); // Wipe current invalid config setting
   }   
 
   Serial.println("Disc name is "+String(config_FSName)+".");
@@ -294,7 +292,6 @@ void setup() {
     Serial.println("Invalid ethernet MAC address configured, "); 
     mac[2] = 0xa4; // 00:00:A4 = Acorn MAC address allocation
     mac[5] = config_Station;
-    writeConfigValue("MAC",""); // Wipe current invalid config setting
   } 
   Serial.println ("Using ethernet MAC address "+String(mac[0],HEX)+":"+String(mac[1],HEX)+":"+String(mac[2],HEX)+":"+String(mac[3],HEX)+":"+String(mac[4],HEX)+":"+String(mac[5],HEX));
 
@@ -305,7 +302,6 @@ void setup() {
   
   if (ip[0]+ip[1]+ip[2]+ip[3] == 0) {
     Serial.println("Invalid IP address configured, using DHCP to get IP...");
-    writeConfigValue("IP",""); // Wipe current invalid config setting 
     etherSelect();
     Ethernet.begin(mac); 
   }  else {
@@ -343,7 +339,7 @@ void setup() {
     sscanf(confBuff, "%u.%u.%u.%u", gateway, gateway + 1, gateway + 2, gateway + 3);
 
     if (gateway[0]+gateway[1]+gateway[2]+gateway[3] == 0) {
-       Serial.println("Netmask not set, using 255.255.255.0");    
+       Serial.println("Gateway not set, using 0.0.0.0");    
        writeConfigValue("Gateway","0.0.0.0"); 
     }
       
@@ -361,7 +357,6 @@ void setup() {
   
   if (ntpserver[0]+ntpserver[1]+ntpserver[2]+ntpserver[3] == 0) {
     Serial.print("NTP server not configured, skipping clock sync");
-    writeConfigValue("NTP","0.0.0.0");    
   } else {
 
     timeServer[0]=ntpserver[0];
@@ -414,7 +409,6 @@ void loop() {
   byte statReg1, statReg2;
   boolean ledStatus=false, inFrame=false;
   int bufPtr=0, frameAddr=0;
-  String lcdTime;
 
   // TODO: Bridge discovery, and set net address
   busWriteMode();
