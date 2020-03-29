@@ -10,10 +10,10 @@ Here is an overview of which NetFS operations are currently working
 | :heavy_check_mark:|  |	*CDir directory| |
 | :heavy_check_mark:|  |	*Delete object| |
 | :heavy_check_mark:|  |	*Dir [directory]| |
-|:heavy_check_mark: |  |	*I am user_name [password]| Sometimes confuses FS number with userid|
+|:heavy_check_mark: |  |	*I am user_name [password]| Now works correctly without password, See issue #33 |
 | :heavy_check_mark: | |	*Info object_spec| |
 |:heavy_check_mark: |  |	*Lib [directory]| |
-|:heavy_check_mark: |  |	*Logon user_name [password]| Same issue as *I AM|
+|:heavy_check_mark: |  |	*Logon user_name [password]| |
 |:heavy_check_mark: |  |	*Pass old_password new_password| |
 | :heavy_check_mark:|  |	*Rename object new_name| |
 | :heavy_check_mark:|  |	*SDisc [:]disc_spec| |
