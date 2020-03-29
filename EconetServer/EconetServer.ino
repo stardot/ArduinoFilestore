@@ -21,12 +21,19 @@ String config_Netmask="000.000.000.000";
 String config_DNS="000.000.000.000";
 String config_Gateway="000.000.000.000";
 String config_NTPserver="000.000.000.000"; // Not defined
+
+// Config values that have to be compiled in
+#define BUFFSIZE 16384 // Size of TX, RX and work buffers
+#define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
+#define DIRENTRYSIZE MAXDEPTH*11+2 // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
+#define MAXFILES 100 // Total maximum number of files  and folders open - note the reply port for block operations is 129+filehandle - keep this in mind when expanding!
+#define MAXUSERS 10 // Total number of user sessions
+
 IPAddress timeServer;
 
 EthernetClient client;
 EthernetUDP Udp;
 unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
-
 
 //Profile structure
 #define PROFILE_PRIV 0
@@ -36,22 +43,6 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define PROFILE_QUOTA 26
 #define PROFILE_BALANCE 30
 #define PROFILE_URD 34
-
-// Protocol retries and timeouts set here!
-#define SCOUTTIMEOUT 100 // Milliseconds to wait for seocnd part of scout during RX 3 
-#define ACKTIMEOUT 200 // mS to wait for scout or payload ack to arrive during TX
-
-#define TXBEGINTIMEOUT 5000 // Milliseconds to wait for network to become ready to TX frame before reporting line jammed
-
-#define TXRETRIES 5 // Number of times to retry a failed frame TX before reporting failed
-#define TXRETRYDELAY 50 //mS to wait between frame retries
-
-#define BUFFSIZE 16384 // Size of TX, RX and work buffers
-#define MAXUSERS 10 // Total number of user sessions
-#define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
-#define DIRENTRYSIZE (MAXDEPTH*11+2) // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
-#define MAXFILES 100 // Total maximum number of files  and folders open - note the reply port for block operations is 129+filehandle - keep this in mind when expanding!
-#define MAXUSERFILES 10 // Maximum files open per login
 
 // Map the 17 Econet module pins to Arduino GPIO pins. D0-D8 are aligned with 8 contiguous bits on a port 
 #define PIN_IRQ 28  // Econet module pin 1
@@ -115,6 +106,13 @@ int expectingBytes[MAXFILES]; // No of bytes to expect in a bulk upload
 int gotBytes[MAXFILES]; // No if bytes so far in a bulk upload
 boolean isSave[MAXFILES]; // Is the bulk upload a save (function 1) operation?
 
+// Protocol retries and timeouts
+int scoutTimeout; // Milliseconds to wait for second part of scout during RX 
+int ackTimeout; // mS to wait for scout or payload ack to arrive during TX
+int txBeginTimeout; // Milliseconds to wait for network to become ready to TX frame before reporting line jammed
+int txRetries; // Number of times to retry a failed frame TX before reporting failed
+int txRetryDelay; //mS to wait between frame retries
+int maxUserFiles; // Maximum files open per login
 
 void setup() {
   
@@ -381,6 +379,57 @@ void setup() {
     printDate();
     Serial.println("");
   }
+
+
+  if (readConfigValue("ScoutTimeout").toInt()==0){
+    Serial.print("Setting default value for scoutTimeout, ");
+    scoutTimeout=100;
+    writeConfigValue("ScoutTimeout","100");
+  } else {
+    scoutTimeout=readConfigValue("ScoutTimeout").toInt();
+  }
+
+  if (readConfigValue("AckTimeout").toInt()==0){
+    Serial.print("Setting default value for ackTimeout, ");
+    ackTimeout=200;
+    writeConfigValue("AckTimeout","200");
+  } else {
+    ackTimeout=readConfigValue("AckTimeout").toInt();
+  }
+
+  if (readConfigValue("TxBeginTimeout").toInt()==0){
+    Serial.print("Setting default value for TxBeginTimeout, ");
+    txBeginTimeout=5000;
+    writeConfigValue("TxBeginTimeout","5000");
+  } else {
+    txBeginTimeout=readConfigValue("TxBeginTimeout").toInt();
+  }
+
+
+  if (readConfigValue("TxRetries").toInt()==0){
+    Serial.print("Setting default value for TxRetries, ");
+    txRetries=5;
+    writeConfigValue("TxRetries","5");
+  } else {
+    txRetries=readConfigValue("TxRetries").toInt();
+  }
+
+  if (readConfigValue("TxRetryDelay").toInt()==0){
+    Serial.print("Setting default value for TxRetryDelay, ");
+    txRetryDelay=50;
+    writeConfigValue("TxRetryDelay","50");
+  } else {
+    txRetryDelay=readConfigValue("TxRetryDelay").toInt();
+  }
+
+ if (readConfigValue("MaxUserFiles").toInt()==0){
+    Serial.print("Setting default value for MaxUserFiles, ");
+    maxUserFiles=10;
+    writeConfigValue("MaxUserFiles","10");
+  } else {
+    maxUserFiles=readConfigValue("MaxUserFiles").toInt();
+  } 
+
   Serial.println("Config load completed");
    
   // Attaching SD filesystem callback for RTC
@@ -417,7 +466,7 @@ void loop() {
   busReadMode();
 
 //  Serial.println("\n-------------------------------\nEntering main loop");
-    Serial.println("\n----------\nEntering main loop");
+    Serial.println("\n----------------------\nEntering main loop");
 
   while (1){ // Enter main event loop
 

@@ -1579,7 +1579,7 @@ void fsSave(int txPort) {
     return;
   }
 
-  if (userOpenFiles[usrHdl] >= MAXUSERFILES) {
+  if (userOpenFiles[usrHdl] >= maxUserFiles) {
     // Run out of file handles
     fsError(0xc0, "Too many open files ", txPort);
     return;
@@ -2366,7 +2366,7 @@ void fsOpen(int txPort) {
     return;
   }
 
-  if (userOpenFiles[usrHdl] >= MAXUSERFILES) {
+  if (userOpenFiles[usrHdl] >= maxUserFiles) {
     // Run out of file handles
     fsError(0xc0, "Too many open files ", txPort);
     return;
@@ -4814,7 +4814,7 @@ int openFolder(int usrHdl, String path) {
     return (0);
   }
 
-  if (userOpenFiles[usrHdl] >= MAXUSERFILES) {
+  if (userOpenFiles[usrHdl] >= maxUserFiles) {
     // Run out of file handles
     //fsError(0xc0,"Too many open files ",txPort);
     return (0);

@@ -72,7 +72,7 @@ void rxFrame(){
         if (rxPort==0x99 || fHandleActive[rxPort-129]){ 
           ackRX();
           gotScout=true;
-          scoutTimeout=millis()+SCOUTTIMEOUT;
+          scoutTimeout=millis()+scoutTimeout;
         }
       }
      
@@ -253,11 +253,11 @@ void rxReset(){
 
 boolean txWithHandshake(int lastByte, int port, int controlByte){
   int attempt=0;
-  while (attempt<TXRETRIES){    
+  while (attempt<txRetries){    
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
     Serial.print("R!");
-    delay(TXRETRYDELAY);
+    delay(txRetryDelay);
   }
   return(false);
 }
@@ -297,7 +297,7 @@ boolean waitIdle(){
 
 //  digitalWriteDirect(PIN_LED,1);
   
-  unsigned long timeOut=millis()+TXBEGINTIMEOUT;
+  unsigned long timeOut=millis()+txBeginTimeout;
 
 
   sr2=0; // Force while loop to run first time
@@ -314,7 +314,7 @@ boolean waitIdle(){
     }
     
     if (millis()>timeOut){
-      Serial.println("Network not idle for TXBEGINTIMEOUT milliseconds - Line Jammed");
+      Serial.println("Network not idle for txBeginTimeout milliseconds - Line Jammed");
       return(false);
     }
 
@@ -334,7 +334,7 @@ boolean txFrame(int bytes, boolean getAck, boolean scout, boolean immediate){
   
   writeCR1(B00000000); // Disable RX interrupts
 
-  timeOut=millis()+TXBEGINTIMEOUT;
+  timeOut=millis()+txBeginTimeout;
   
   while(!(readSR1() & 64)){ // If we don't have TDRA, clear status until we do!  
     writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
@@ -392,7 +392,7 @@ boolean waitForAck(){
   byte statReg1, statReg2;
   boolean ackResult=false, inLoop=true;
  
-  unsigned long timeOut=millis()+ACKTIMEOUT;
+  unsigned long timeOut=millis()+ackTimeout;
 
   resetIRQ();
 
