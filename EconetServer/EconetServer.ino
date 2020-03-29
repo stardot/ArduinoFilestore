@@ -44,7 +44,7 @@ unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
 #define TXBEGINTIMEOUT 5000 // Milliseconds to wait for network to become ready to TX frame before reporting line jammed
 
 #define TXRETRIES 5 // Number of times to retry a failed frame TX before reporting failed
-#define TXRETRYDELAY 200 //mS to wait between frame retries 100
+#define TXRETRYDELAY 50 //mS to wait between frame retries
 
 #define BUFFSIZE 16384 // Size of TX, RX and work buffers
 #define MAXUSERS 10 // Total number of user sessions
@@ -417,7 +417,7 @@ void loop() {
   busReadMode();
 
 //  Serial.println("\n-------------------------------\nEntering main loop");
-    Serial.println("\n------\nEntering main loop");
+    Serial.println("\n----------\nEntering main loop");
 
   while (1){ // Enter main event loop
 
