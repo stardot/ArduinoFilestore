@@ -50,10 +50,10 @@ void fsOperation (int bytes) {
       else if (param1C.startsWith("I.")) fsInfo(replyPort,true); 
       else if (param1C.startsWith("FSSTATUS")) fsStatus(replyPort,bytes); 
       else if (param1C.startsWith("FSCONFIGURE")) fsConfigure(replyPort,bytes); 
+      else if (param1C.startsWith("LOGOFF")) fsForceLogoff(replyPort,bytes);
 
       // Unimplemented commands are:
       // ACCESS
-      // LOGOFF
 
       else {
         txBuff[0] = rxBuff[2];
@@ -396,6 +396,7 @@ void fsLogin(byte txPort, String command, int bytesRX) {
 
   return;
 }
+
 
 void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   SdFile file;
@@ -1311,7 +1312,6 @@ void fsStatus(byte txPort, int bytesRx) {
 
 }
 
-
 void fsConfigure(byte txPort, int bytesRx) {
   FatFile profileHdl;
   sdSelect(); // Make sure SD card is selected on the SPI bus
@@ -1363,6 +1363,108 @@ void fsConfigure(byte txPort, int bytesRx) {
   if (txWithHandshake(6 , txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
 
 }
+
+void fsForceLogoff(byte txPort, int bytesRX) {
+  boolean complete = false;
+  String message="";
+
+  Serial.print(F("Force logoff of user "));
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  if (!isSystemUser(usrHdl)) {
+    fsError(0xBA, F("Insufficient privilege"), txPort);
+    return;
+  }  
+
+  if (bytesRX < 17) { // No user specified
+    fsError(0xFE, F("No user specified"), txPort);
+    return;
+  }
+
+  String user = getStringFromRX(16, 21);
+  user.toUpperCase();
+
+  // See if I can parse a number  - TODO: Need to capture case of username starting with digits.
+  int userNum = -1;
+  if (rxBuff[16]>47 && rxBuff[16]<57) {
+    userNum=rxBuff[16]-48;
+
+    if (bytesRX>17 && rxBuff[17]>47 && rxBuff[17]<57) {
+      userNum=userNum*10;
+      userNum+=(rxBuff[17]-48);
+
+      if (bytesRX>18 && rxBuff[18]>47 && rxBuff[18]<57) {
+        userNum=userNum*10;
+        userNum+=(rxBuff[18]-48);
+       
+      }
+    }
+  }
+
+  if (userNum>-1 && userNum<MAXUSERS && stataddress[userNum]!=0){
+    // User number is valid, and points to an active handle 
+    
+    Serial.print(F("number "));
+    Serial.print(userNum);
+    Serial.print(" ");
+
+    message="Logging off "+getUsername(userNum)+" from "+(String)netaddress[userNum]+"."+(String)stataddress[userNum];
+
+    fsCloseUserFiles(userNum);
+    stataddress[userNum] = 0;
+    netaddress[userNum] = 0;
+
+    complete=true;
+   
+  } else {
+    // User number not valid, or points to inactive handle
+    Serial.println(user);  
+
+    for (int thisRecord = 0; thisRecord < MAXUSERS; thisRecord++) {
+      if (stataddress[thisRecord] != 0) {
+        // User handle is in use
+        if (user.equals(getUsername(thisRecord))){
+  
+          Serial.print(F(" logging off from "));
+          Serial.print(netaddress[thisRecord]);
+          Serial.print(".");
+          Serial.print(stataddress[thisRecord]);
+
+          message+="Logging off from "+(String)netaddress[thisRecord]+"."+(String)stataddress[thisRecord]+" ";
+  
+          fsCloseUserFiles(thisRecord);
+          stataddress[thisRecord] = 0;
+          netaddress[thisRecord] = 0;         
+
+          complete=true;
+
+        }
+      }
+    }
+  }
+
+  if (!complete) message="User not logged in";
+
+  Serial.print(message);
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = rxBuff[0];
+  txBuff[3] = rxBuff[1];
+  txBuff[4] = 0; // Command code 0
+  txBuff[5] = 0x80; // Undefined, causes string to be printed by client
+  message += "\r";
+  writeStringtoTX(message, 6, (message.length() + 1));
+  
+  if (txWithHandshake(6 + message.length(), txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Function 1 - Save
 /////////////////////////////////////////////////////////////////////
