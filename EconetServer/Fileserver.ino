@@ -218,7 +218,10 @@ void fsOperation (int bytes) {
       fsReadClientID(replyPort);
       break;
 
-    // TODO: 33 Read current user information (extended)
+    case 33:
+      Serial.print(F("Read Current Users (Extended)"));
+      fsReadCurrentUsersExtended(replyPort);
+      break;
 
     // TODO: 34 Read user information (extended)
 
@@ -4378,6 +4381,80 @@ void fsReadClientID(int txPort) {
   Serial.print(F(", sending name"));
 
   if (txWithHandshake(bufPtr, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function 33 - Read Current Users information (extended)
+/////////////////////////////////////////////////////////////////////
+
+void fsReadCurrentUsersExtended(int txPort) {
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  byte firstRecord = rxBuff[9];
+  byte totalRecords = rxBuff[10];
+
+  if (totalRecords == 0) totalRecords = MAXUSERS;
+
+  Serial.print(F(" - user "));
+  Serial.print(usrHdl);
+  Serial.print(F(" from "));
+  Serial.print(firstRecord);
+  Serial.print(F(" to "));
+  Serial.print(totalRecords);
+
+  byte recordsReturned = 0;
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = config_Station;
+  txBuff[3] = config_Net;
+  txBuff[4] = 0x00;
+  txBuff[5] = 0x00;
+  // txBuff[6]=0x00; // Entries returned - gets written later
+
+  int bufptr = 7;
+
+  for (int thisRecord = firstRecord; thisRecord < MAXUSERS; thisRecord++) {
+    if (stataddress[thisRecord] != 0) {
+      // User handle is in use
+      // Add station details
+      txBuff[bufptr] = stataddress[thisRecord];
+      bufptr++;
+      txBuff[bufptr] = netaddress[thisRecord];
+      bufptr++;
+
+      // Add task number
+      txBuff[bufptr] = thisRecord;
+      bufptr++;
+
+      // Add user details
+      String userName = getUsername(thisRecord);
+      userName.toCharArray((char *)&txBuff[bufptr], 22);
+      bufptr += userName.length();
+      txBuff[bufptr] = 0x0D; //Return character
+      bufptr++;
+
+      // Add priv details
+      txBuff[bufptr] = userPriv[thisRecord];
+      bufptr++;
+
+      recordsReturned++;
+    }
+    if (recordsReturned == totalRecords) break;
+  }
+
+  txBuff[6] = recordsReturned;
+
+  Serial.print(F(", sending "));
+  Serial.print(recordsReturned);
+
+  if (txWithHandshake(bufptr, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
 }
 
 /////////////////////////////////////////////////////////////////////
