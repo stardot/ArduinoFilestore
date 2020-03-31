@@ -82,7 +82,10 @@ void fsOperation (int bytes) {
       fsExamine(replyPort);
       break;
 
-    // 4 - Catalogue header
+    case 4:
+      Serial.print(F("Catalogue Header "));
+      fsCatHeader(replyPort,bytes);
+      break;
 
     case 5:
       Serial.print(F("Load as"));
@@ -2275,6 +2278,86 @@ void fsExamine(int txPort) {
   Serial.print(F(", found items: "));
   Serial.print(dirCount, HEX);
   if (txWithHandshake(bufpos + 1, txPort, 0x80)) Serial.println(F(" .")); else Serial.println(F(" !"));
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Function 4 - Catalogue Header
+/////////////////////////////////////////////////////////////////////
+
+void fsCatHeader(int txPort, int bytes) {
+  SdFile file;
+  dir_t dirEntry;
+  sdSelect(); // Make sure SD card is selected on the SPI bus
+
+  String workingDir, requestDirectory, dirName;
+
+  int usrHdl = fsGetUserHdl(rxBuff[3], rxBuff[2]);
+  if (usrHdl == -1) {
+    fsError(0xBF, F("Who are you?"), txPort);
+    return;
+  }
+
+  workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
+  
+  if (bytes>9) dirName=getStringFromRX(9, DIRENTRYSIZE); else dirName="";
+ 
+  Serial.print(F(" - user "));
+  Serial.print(usrHdl);
+  Serial.print(F(" dir handle "));
+  Serial.print(rxBuff[7]);
+  Serial.print(F(" working dir "));
+  Serial.print(workingDir);
+  Serial.print(F(", request dir "));
+  Serial.print(dirName);
+  Serial.print(F(" disk path "));
+  String fatPath = convertToFATPath(dirName, workingDir, txPort);
+  Serial.print(fatPath);
+
+  // No access control required, directories are always readable
+
+  fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
+
+  if (!sd.exists(pathBuff1)) {
+    //Object not found - send error and leave
+    Serial.print(" - ");
+    fsError(0xD6, F("Not found"), txPort);
+    return;
+  }
+
+  if (file.open(pathBuff1, O_READ)) {
+    if (!file.isDir()) {
+      file.close();
+      fsError(0xBE, F("Object not a directory"), txPort);
+      return;
+    }
+    file.getName(pathBuff4, DIRENTRYSIZE);
+    dirName=pathBuff4;
+    file.close();
+  }
+  
+  // Build reply
+
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = rxBuff[0];
+  txBuff[3] = rxBuff[1];
+  txBuff[4] = 0; // Command code
+  txBuff[5] = 0; // Is successful
+
+  writeStringtoTX(dirName, 6, 10);
+  if (fatPath.startsWith(getURD(usrHdl),0)) txBuff[16]=0x4F; else txBuff[16]=0x50; // O or P
+
+  txBuff[17]= 0x20;
+  txBuff[18]= 0x20;
+  txBuff[19]= 0x20;
+
+  writeStringtoTX(config_FSName, 20, 15);
+
+  txBuff[35]=0x0d;
+  txBuff[36]=0x80;
+    
+  if (txWithHandshake(37, txPort, 0x80)) Serial.println(F(".")); else Serial.println(F("!"));
+
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
