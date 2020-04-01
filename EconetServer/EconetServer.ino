@@ -6,21 +6,16 @@
 #include <time.h>
 #include <TimeLib.h>
 
-// Global Configration value defaults
+// Configuration root folder
 String config_confRoot="/config";
-// These will be read from config folder specified above, defaults defined later if not present
-String config_FSRoot="/export"; 
-String config_MetaRoot="/meta";
-String config_ProfileRoot="/users";
+
+// Econet station will be read from config folder specified above, if missing will default to value here
 byte config_Station=170;
-String config_FSName="Arduino170";
 byte config_Net=0; // TODO: Not strictly speaking config, Needs a bridge discovery to fix this later on
-String config_etherMAC="00:00:00:00:00:00";
-String config_IP="000.000.000.000"; // Use DHCP
-String config_Netmask="000.000.000.000";
-String config_DNS="000.000.000.000";
-String config_Gateway="000.000.000.000";
-String config_NTPserver="000.000.000.000"; // Not defined
+
+// Other config options defaults defined as they are read in.
+String config_FSRoot, config_MetaRoot, config_ProfileRoot, config_FSName;
+String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, config_NTPserver;
 
 // Config values that have to be compiled in
 #define BUFFSIZE 16384 // Size of TX, RX and work buffers
@@ -205,19 +200,22 @@ void setup() {
   // Load configuration from card, or apply default values if missing
   config_FSRoot=readConfigValue("FSRoot");
   if (config_FSRoot.length()==0) {
+    config_FSRoot="/export"; 
     writeConfigValue("FSRoot",config_FSRoot);
   }
-
-  
+ 
   config_MetaRoot=readConfigValue("MetaRoot");
   if (config_MetaRoot.length()==0) {
+    config_MetaRoot="/meta";
     writeConfigValue("MetaRoot",config_MetaRoot);
   }
 
   config_ProfileRoot=readConfigValue("ProfileRoot");
   if (config_ProfileRoot.length()==0) {
+    config_ProfileRoot="/users";
     writeConfigValue("ProfileRoot",config_ProfileRoot);
   }   
+  
   config_FSRoot.toCharArray(pathBuff1, 255);
   if(!sd.exists(pathBuff1)){
     if(sd.mkdir(pathBuff1)) Serial.println("Created FS Root directory"); else Serial.println("FS root not present, and failed to mkdir "+config_FSRoot);  
@@ -299,6 +297,7 @@ void setup() {
   
   if (ip[0]+ip[1]+ip[2]+ip[3] == 0) {
     Serial.println("Invalid IP address configured, using DHCP to get IP..."); 
+      if (config_IP.length()==0) writeConfigValue("IP","0.0.0.0");    // Default to DHCP
     etherSelect();
     Ethernet.begin(mac); 
   }  else {
