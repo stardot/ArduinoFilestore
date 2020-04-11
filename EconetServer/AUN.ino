@@ -17,7 +17,7 @@
   int type=rxBuff[0];
   int rxPort=rxBuff[1];
   int controlByte=rxBuff[2];
-  unsigned long aunSeq=rxBuff[7]<<24)+(rxBuff[6]<<16)+(rxBuff[5]<<8)+rxBuff[4];
+  unsigned long aunSeq=(rxBuff[7]<<24)+(rxBuff[6]<<16)+(rxBuff[5]<<8)+rxBuff[4];
   
   Serial.print (" Received AUN frame of ");
   Serial.print (bytes);
