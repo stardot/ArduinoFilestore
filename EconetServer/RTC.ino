@@ -7,16 +7,16 @@ const int timeZone = 0;     // GMT
 time_t getNtpTime(){
   etherSelect();
   Serial.print("getNtpTime called... ");
-  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  while (ntpUdp.parsePacket() > 0) ; // discard any previously received packets
   //Serial.println("NTP Request sent ");
   sendNTPpacket(timeServer);
   uint32_t beginWait = millis();
   while (millis() - beginWait < 1500) {
-    int size = Udp.parsePacket();
+    int size = ntpUdp.parsePacket();
 
     if (size >= NTP_PACKET_SIZE) {
       //Serial.println("Receive NTP Response");
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+      ntpUdp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
       unsigned long secsSince1900;
       // convert four bytes starting at location 40 to a long integer
       secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
@@ -48,9 +48,9 @@ void sendNTPpacket(IPAddress &address){
   packetBuffer[15]  = 52;
   // all NTP fields have been given values, now
   // you can send a packet requesting a timestamp:                 
-  Udp.beginPacket(address, 123); //NTP requests are to port 123
-  Udp.write(packetBuffer, NTP_PACKET_SIZE);
-  Udp.endPacket();
+  ntpUdp.beginPacket(address, 123); //NTP requests are to port 123
+  ntpUdp.write(packetBuffer, NTP_PACKET_SIZE);
+  ntpUdp.endPacket();
 }
 
 void printTime(){

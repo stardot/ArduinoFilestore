@@ -1,3 +1,5 @@
+// Routines to interface with Econet hardware
+
 void resetIRQ(){
   writeCR1(B00000010); // Enable RX interrupts, select address 1
   writeCR2(B01100001); // Clear RX and TX status, prioritise status 

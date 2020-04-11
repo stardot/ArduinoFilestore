@@ -1,3 +1,5 @@
+// Native Econet frame handling routines
+
 void rxFrame(){
   int ptr=0;
   byte stat=0;

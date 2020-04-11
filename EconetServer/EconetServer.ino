@@ -26,9 +26,12 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 
 IPAddress timeServer;
 
-EthernetClient client;
-EthernetUDP Udp;
-unsigned int localUDPPort = 8888;  // local port to listen for UDP packets
+//EthernetClient client;
+EthernetUDP aunUdp;
+unsigned int aunUDPsrcPort = 0x8000;  // AUN udp local port
+
+EthernetUDP ntpUdp;
+unsigned int ntpUDPsrcPort = 8888;  // NTP udp local port (not used)
 
 //Profile structure
 #define PROFILE_PRIV 0
@@ -345,7 +348,13 @@ void setup() {
 
   Serial.print("Ethernet config complete - IP address: ");
   Serial.println(Ethernet.localIP());
- 
+  
+  if (!aunUdp.begin(aunUDPsrcPort)){
+    Serial.println("AUN UDP port open failed - halting ");
+    while (1);  
+  }
+  Serial.println("AUN UDP port opened ");
+
   config_NTPserver=readConfigValue("NTP");
   byte ntpserver[] = {0, 0, 0, 0}; 
   config_NTPserver.toCharArray(confBuff,16);  
@@ -361,7 +370,7 @@ void setup() {
     timeServer[2]=ntpserver[2];
     timeServer[3]=ntpserver[3];
         
-    Udp.begin(localUDPPort);
+    ntpUdp.begin(ntpUDPsrcPort);
     Serial.println("Waiting for NTP time sync from "+String(ntpserver[0])+"."+String(ntpserver[1])+"."+String(+ntpserver[2])+"."+String(+ntpserver[3])+"...");
   
     int attempt=1;
@@ -378,7 +387,6 @@ void setup() {
     printDate();
     Serial.println("");
   }
-
 
   if (readConfigValue("ScoutTimeout").toInt()==0){
     Serial.print("Setting default value for scoutTimeout, ");
@@ -438,6 +446,9 @@ void setup() {
   Serial.print("Initialising Econet controller....");
   initADLC();
   Serial.println(" done.");
+
+
+
   
   int ptr=0;
 
@@ -456,7 +467,7 @@ void loop() {
   unsigned long nextEvent,LCDupdate=0;
   byte statReg1, statReg2;
   boolean ledStatus=false, inFrame=false;
-  int bufPtr=0, frameAddr=0;
+  int bufPtr=0, frameAddr=0, udpPacketSize=0;
   String lcdTime;
 
   // TODO: Bridge discovery, and set net address
@@ -470,7 +481,7 @@ void loop() {
   while (1){ // Enter main event loop
 
     if (!digitalReadDirect(PIN_IRQ)){
-      //There is an IRQ to service
+      //There is an Econet IRQ to service
       statReg1=readSR1();
  
       if (statReg1 & 2){
@@ -493,6 +504,12 @@ void loop() {
         resetIRQ(); //Reset IRQ as not expecting anything!
 
       } // end of SR2 servicing
-    } // end of IRQ to service 
+    } // end of IRQ to service
+
+    // Check for AUN packets
+    etherSelect();
+    udpPacketSize=aunUdp.parsePacket();
+    if (udpPacketSize) aunRXframe(udpPacketSize);
+    
   } // end of event loop  
 } // Program loop
