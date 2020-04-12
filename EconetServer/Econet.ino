@@ -11,15 +11,27 @@ void rxFrame(){
   // First byte should be address
   rxBuff[0]=readFIFO();
 
-  // TODO: Should check net number here too
-
   if (rxBuff[0] != config_Station && rxBuff[0] != 255 ) {
       // If frame is not for me, or a broadcast, then bail out
       resetIRQ();
       return;
   }
+
+  // Wait for second byte (net address) 
+  do {
+    stat=readSR2();
+  } while (!(stat & 250)); // While no errors, or available data - keep polling
   
-  ptr=1;
+  rxBuff[1]=readFIFO();
+  
+  if (rxBuff[1] != config_Net && rxBuff[1] != 0 && !(rxBuff[1] >252) ) {
+      // If frame is not addressed to my network, or a broadcast, then bail out
+      // Nets: 255 - global short broadcast (8 bytes), 254 - global large broadcast (1020/1024 maximum), 253 - local large broadcast  
+      resetIRQ();
+      return;
+  }
+  
+  ptr=2;
 
   if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("rS!");} ;
 
