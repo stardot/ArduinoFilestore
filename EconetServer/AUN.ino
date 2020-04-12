@@ -55,7 +55,7 @@
   Serial.print ("= ");
   
   for (int ptr1=8; ptr1 < bytes ; ptr1++){
-    if (rxBuff[ptr1]<32 || rxBuff[ptr1]> 126){
+    if (workBuff[ptr1]<32 || workBuff[ptr1]> 126){
       Serial.print (".");
     } else {
       Serial.write (workBuff[ptr1]);
