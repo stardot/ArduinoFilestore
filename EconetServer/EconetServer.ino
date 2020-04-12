@@ -26,9 +26,10 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 
 IPAddress timeServer;
 
-//EthernetClient client;
 EthernetUDP aunUdp;
 unsigned int aunUDPsrcPort = 0x8000;  // AUN udp local port
+IPAddress currentAUNrxIP;
+unsigned long aunSeqNo;
 
 EthernetUDP ntpUdp;
 unsigned int ntpUDPsrcPort = 8888;  // NTP udp local port (not used)
@@ -79,6 +80,7 @@ boolean busWrite = false; // Global flag to indicate data bus direction
 byte rxPort = 255;
 byte rxControlByte=255;
 boolean gotScout=false;
+
 
 // Reserve space for server tables
 char userURD[DIRENTRYSIZE*MAXUSERS];
