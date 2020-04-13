@@ -79,6 +79,7 @@ char confBuff[255];
 boolean portInUse[255];
 char fileToPort[MAXFILES];
 char portToFile[255];
+boolean isNetAUN[255];
 
 
 boolean busWrite = false; // Global flag to indicate data bus direction
@@ -478,7 +479,12 @@ void setup() {
     portInUse[ptr]=false;
   }
   portInUse[0x99]=true; // Mark fileserver port in use
-  
+
+  // Initialise the AUN mapping - this needs to go into config
+  for (ptr=0; ptr<256; ptr++){
+    isNetAUN[ptr]=false;
+  }
+  isNetAUN[128]=true;
 }
 
 

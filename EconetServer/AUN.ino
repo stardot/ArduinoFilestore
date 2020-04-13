@@ -129,10 +129,10 @@ void rxAUNframe(int frameSize){
   rxPort=workBuff[1]; // Set globals
   rxControlByte=workBuff[2];
   
-  rxBuff[0]=0; // Address 0.0 isn't valid, this will be picked up later to indicate an AUN reception was involved
+  rxBuff[0]=0; // dest address doesn't matter - as the packet is here now
   rxBuff[1]=0;
-  rxBuff[2]=0;
-  rxBuff[3]=0;
+  rxBuff[2]=currentAUNrxIP[3]; // src address
+  rxBuff[3]=currentAUNrxIP[2];
   
   memcpy(rxBuff+4,workBuff+8,frameSize-8);
 
