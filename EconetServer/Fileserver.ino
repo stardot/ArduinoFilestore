@@ -252,8 +252,7 @@ void fsOperation (int bytes) {
       break;
   }
 
-  etherSelect(); // Reselect EtherNet card
-  Serial.print (F("# "));
+  etherSelect(); // Reselect Ethernet card
 }
 
 void fsLogin(byte txPort, String command, int bytesRX) {

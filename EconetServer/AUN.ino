@@ -186,9 +186,8 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
     if (!gotAck) return (false); // Failed to get ACK
     
     // Success   
-    Serial.println (".");   
   } else { 
-    Serial.println (F(" - AUN send failed."));
+    Serial.print (F(" - AUN send failed."));
     return (false); 
   };    
 

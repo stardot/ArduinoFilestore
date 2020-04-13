@@ -139,24 +139,27 @@ void rxBroadcast (int bytes){
   printTime();
 
   if (rxPort==0xB7 && controlByte==0x80){
-    Serial.print (" Freeway advertisement received from ");
+    Serial.print (F(" Latest Freeway advertisement received from "));
     Serial.print (rxBuff[3]);
     Serial.print (".");
-    Serial.println (rxBuff[2]);    
+    Serial.print (rxBuff[2]);    
+    Serial.print (" at ");
+    printTime();
+    Serial.print ("\r");    
     return;
   }
   
-  Serial.print (" Received broadcast of ");
+  Serial.print (F(" Received broadcast of "));
   Serial.print (bytes-6);
-  Serial.print (" bytes from ");
+  Serial.print (F(" bytes from "));
   Serial.print (rxBuff[3]);
   Serial.print (".");
   Serial.print (rxBuff[2]);
-  Serial.print (", control byte = ");
+  Serial.print (F(", control byte = "));
   Serial.print (controlByte,HEX);
-  Serial.print (", port = ");
+  Serial.print (F(", port = "));
   Serial.print (rxPort,HEX);
-  Serial.print(", bytes: "); 
+  Serial.print (F(", bytes: ")); 
   for (int ptr1=6; ptr1 < bytes ; ptr1++){
     Serial.print (rxBuff[ptr1],HEX);
     Serial.print (" ");
