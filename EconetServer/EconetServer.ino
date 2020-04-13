@@ -29,7 +29,7 @@ IPAddress timeServer;
 EthernetUDP aunUdp;
 unsigned int aunUDPsrcPort = 0x8000;  // AUN udp local port
 IPAddress currentAUNrxIP;
-unsigned long aunSeqNo;
+unsigned long aunSeqNo = 0;
 
 EthernetUDP ntpUdp;
 unsigned int ntpUDPsrcPort = 8888;  // NTP udp local port (not used)
@@ -69,7 +69,8 @@ unsigned int ntpUDPsrcPort = 8888;  // NTP udp local port (not used)
 byte rxBuff[BUFFSIZE];
 byte txBuff[BUFFSIZE];
 byte scoutBuff[8];
-byte workBuff[BUFFSIZE];
+byte ackBuff[8];
+byte workBuff[BUFFSIZE+8]; // Allow for larger AUN frames
 char pathBuff1[DIRENTRYSIZE];
 char pathBuff2[DIRENTRYSIZE];
 char pathBuff3[DIRENTRYSIZE];
@@ -190,7 +191,7 @@ void setup() {
     Serial.println(freeBytes);
   }
 
-  Serial.println("SD card initialisation completed\nLoading config from card...");
+  Serial.println("SD card initialisation completed, Loading config from card...");
 
   config_confRoot.toCharArray(pathBuff1, 255);
   if(!sd.exists(pathBuff1)){
@@ -478,7 +479,9 @@ void loop() {
   busReadMode();
 
 //  Serial.println("\n-------------------------------\nEntering main loop");
-    Serial.println("\n----------------------\nEntering main loop");
+    Serial.println("\r\n----------------------\r\nEntering main loop");
+
+  nextEvent=millis()+1000;
 
   while (1){ // Enter main event loop
 
@@ -512,6 +515,12 @@ void loop() {
     etherSelect();
     udpPacketSize=aunUdp.parsePacket();
     if (udpPacketSize) aunRXframe(udpPacketSize);
-    
+
+    // Write clock to console (confidence display that code is still running)
+    if (millis()>nextEvent){
+      printTime();
+      Serial.print("\r");
+      nextEvent=millis()+1000;
+    }
   } // end of event loop  
 } // Program loop

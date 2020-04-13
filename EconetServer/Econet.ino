@@ -267,6 +267,9 @@ void rxReset(){
 
 boolean txWithHandshake(int lastByte, int port, int controlByte){
   int attempt=0;
+
+  if (txBuff[0]==0 && txBuff[1]==0) return (txAUNframe(port, controlByte, lastByte)); // Destination set to 0.0 - this is a reply to an AUN frame
+  
   while (attempt<txRetries){    
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
