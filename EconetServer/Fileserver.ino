@@ -403,7 +403,6 @@ void fsLogin(byte txPort, String command, int bytesRX) {
   return;
 }
 
-
 void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   SdFile file;
   sdSelect(); // Make sure SD card is selected on the SPI bus
@@ -1591,6 +1590,15 @@ void fsSave(int txPort) {
     return;
   }
 
+  byte dataPort=getNextAvailPort();
+
+  if (!dataPort) {
+    // Run out of network ports, treat as too many files open
+    fsError(0xc0, "Too many open files ", txPort);
+    return;
+  }
+  
+
   //TODO: Check if file is already open. Refuse write request if any other handles open, refuse read if open for write.
 
   // Open for writing, create if necessary
@@ -1603,7 +1611,10 @@ void fsSave(int txPort) {
     return;
   }
 
-  byte dataPort = fHdl + 129; // Makes life easier to find the filehandle
+  portInUse[dataPort]=true;
+  portToFile[dataPort]=fHdl;
+  fileToPort[fHdl]=dataPort;
+  
   int maxTXSize = BUFFSIZE - 6;
 
   // Set up the tables
@@ -1625,7 +1636,11 @@ void fsSave(int txPort) {
   if (!file.open(pathBuff2, (O_RDWR | O_CREAT))) {
     // File create failed
     // TODO better error response
-    fsError(0xBD, "Metadata file creation failed, because reasons", txPort);
+    fsError(0xBD, "Metadata file "+fatPath+" creation failed, because reasons", txPort);
+    Serial.print("SD card error: ");
+    Serial.print(sd.card()->errorCode(), HEX);
+    Serial.print(" file error bits: ");
+    Serial.println(file.getError(), BIN);
     return;
   }
 
@@ -2532,6 +2547,14 @@ void fsClose(int txPort) {
       return;
     }
     // Still here, so file  or folder really does need closing
+
+    // Check and close bulk transfer port if open
+    if (portInUse[fileToPort[fileHandle]]){
+      portInUse[fileToPort[fileHandle]]=false;
+      portToFile[fileToPort[fileHandle]]=0;
+      fileToPort[fileHandle]=0;
+    }
+   
     fHandleActive[fileHandle] = false;
     fHandleUser[fileHandle] = -1;
     userOpenFiles[usrHdl]--;
@@ -2552,10 +2575,18 @@ void fsClose(int txPort) {
         fHandleUser[ptr] = -1;
         userOpenFiles[usrHdl]--;
         fHandle[ptr].close();
+
+        // Check and close bulk transfer port if open
+        if (portInUse[fileToPort[ptr]]){
+          portInUse[fileToPort[ptr]]=false;
+          portToFile[fileToPort[ptr]]=0;
+          fileToPort[ptr]=0;
+        }
       }
     }
   }
-  // Still here, so.response
+
+  // Still here, so respond successful
   txBuff[0] = rxBuff[2];
   txBuff[1] = rxBuff[3];
   txBuff[2] = config_Station;
@@ -2843,8 +2874,20 @@ void fsPutBytes(int txPort) {
   byte useOffset = rxBuff[10];
   unsigned long bytesToWrite = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
-  byte dataPort = fileHandle + 129; // Makes life easier to find the filehandle
   int maxTXSize = BUFFSIZE - 6;
+
+  byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
+  if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
+
+  if (!dataPort) {
+    // Run out of network ports, treat as too many files open
+    fsError(0xc0, "Too many open files ", txPort);
+    return;
+  }
+  
+  portInUse[dataPort]=true;
+  portToFile[dataPort]=fileHandle;
+  fileToPort[fileHandle]=dataPort;
 
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
@@ -2923,7 +2966,7 @@ void fsPutBytes(int txPort) {
 void fsBulkRXArrived(int rxPort, int bytesRX) {
   sdSelect(); // Make sure SD card is selected on the SPI bus
 
-  int fileHandle = (rxPort - 129);
+  int fileHandle = portToFile[rxPort];
   byte ackPort = dataAckPort[fileHandle];
   byte replyPort = dataReplyPort[fileHandle];
 
@@ -3020,6 +3063,10 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       }
 
       // Close the filehandle and mark inactive in the table
+      portInUse[rxPort]=false;
+      portToFile[rxPort]=0;
+      fileToPort[fileHandle]=0;
+      
       fHandle[fileHandle].truncate(expectingBytes[fileHandle]); // Ensure file is correct size - might be overwriting existing file
       fHandle[fileHandle].close();
       userOpenFiles[usrHdl]--;
@@ -5107,4 +5154,13 @@ boolean isObjectLocked(String file){
   int fileAttr=getAttributes(pathBuff1);
   if (fileAttr && (fileAttr & 16)) return true;
   return false;
+}
+
+char getNextAvailPort(){
+  // Port 0 is wildcard, so is not offered and instead used to indicate an error.
+  for (int ptr=1; ptr<256; ptr++){
+    if (!portInUse[ptr]) return (ptr);
+  }  
+  
+  return (0);
 }

@@ -21,7 +21,7 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 #define BUFFSIZE 16384 // Size of TX, RX and work buffers
 #define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
 #define DIRENTRYSIZE MAXDEPTH*11+2 // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
-#define MAXFILES 100 // Total maximum number of files  and folders open - note the reply port for block operations is 129+filehandle - keep this in mind when expanding!
+#define MAXFILES 100 // Total maximum number of files and folders open
 #define MAXUSERS 10 // Total number of user sessions
 
 IPAddress timeServer;
@@ -76,6 +76,11 @@ char pathBuff2[DIRENTRYSIZE];
 char pathBuff3[DIRENTRYSIZE];
 char pathBuff4[DIRENTRYSIZE];
 char confBuff[255];
+boolean portInUse[255];
+char fileToPort[MAXFILES];
+char portToFile[255];
+
+
 boolean busWrite = false; // Global flag to indicate data bus direction
 
 byte rxPort = 255;
@@ -459,9 +464,20 @@ void setup() {
   for (ptr=0; ptr<MAXUSERS; ptr++){
     stataddress[ptr]=0;
     netaddress[ptr]=0;
+  }  
+
+  // Initialise the file tables
+  for (ptr=0; ptr<MAXFILES; ptr++){
     fHandleActive[ptr]=false;    
     fHandleUser[ptr]=-1;    
+    fileToPort[MAXFILES]=0;
   }  
+  
+  // Initialise the file to port mapping
+  for (ptr=0; ptr<256; ptr++){
+    portInUse[ptr]=false;
+  }
+  portInUse[0x99]=true; // Mark fileserver port in use
   
 }
 

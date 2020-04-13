@@ -109,17 +109,18 @@
 }
 
 void rxAUNframe(int frameSize){
+  //workbuff[1] contains rxPort
+  
   etherSelect();  // Select ethernet interface on SPI bus
   
-  if (!(workBuff[1]==0x99 || fHandleActive[workBuff[1]-129])) return; // Not expecting a frame on that port
+  if (!portInUse[workBuff[1]]) return; // Not expecting a frame on that port
 
+  // Send acknowledgement
   workBuff[0]=3; //ACK frame
-  
   if (!aunUdp.beginPacket(currentAUNrxIP, aunUDPsrcPort)){
     Serial.print(F("- AUN ACK send failed "));
     return;
-  }
-    
+  }    
   aunUdp.write(workBuff, 8);
   aunUdp.endPacket(); 
   
@@ -135,8 +136,8 @@ void rxAUNframe(int frameSize){
   
   memcpy(rxBuff+4,workBuff+8,frameSize-8);
 
-  if (workBuff[1]==0x99) fsOperation(frameSize-4); // 0x99 FS port
-  if (workBuff[1]>129 && fHandleActive[workBuff[1]-129]) fsBulkRXArrived(workBuff[1],frameSize-2);
+  if (rxPort==0x99) fsOperation(frameSize-4); // 0x99 FS port
+  if (portToFile[rxPort]) fsBulkRXArrived(rxPort,frameSize-4); // If valid filehandle attached to port do bulk rx
 }
 
 boolean txAUNframe(int port, int controlByte, int ecoFrameSize){

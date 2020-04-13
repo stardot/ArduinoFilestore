@@ -83,7 +83,8 @@ void rxFrame(){
         rxControlByte=rxBuff[4];
         rxPort=rxBuff[5];
 
-        if (rxPort==0x99 || fHandleActive[rxPort-129]){ 
+        // Only acknowledge if we are expecting something on the port
+        if (portInUse[rxPort]){ 
           ackRX();
           gotScout=true;
           scoutTimeout=millis()+scoutTimeout;
@@ -277,8 +278,6 @@ void rxReset(){
 boolean txWithHandshake(int lastByte, int port, int controlByte){
   int attempt=0;
 
-  if (txBuff[0]==0 && txBuff[1]==0) return (txAUNframe(port, controlByte, lastByte)); // Destination set to 0.0 - this is a reply to an AUN frame
-  
   while (attempt<txRetries){    
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
@@ -289,6 +288,10 @@ boolean txWithHandshake(int lastByte, int port, int controlByte){
 }
 
 boolean txWithHandshakeInner(int lastByte, int port, int controlByte){
+
+  // If destination set to 0.0 - this is a reply to an AUN frame
+  if (txBuff[0]==0 && txBuff[1]==0) return (txAUNframe(port, controlByte, lastByte)); 
+  
   //First generate the scout  
   scoutBuff[0]=txBuff[0];
   scoutBuff[1]=txBuff[1];
