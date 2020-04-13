@@ -136,6 +136,15 @@ void rxBroadcast (int bytes){
   int controlByte=rxBuff[4];
   int rxPort=rxBuff[5];
   printTime();
+
+  if (rxPort==0xB7 && controlByte==0x80){
+    Serial.print (" Freeway advertisement received from ");
+    Serial.print (rxBuff[3]);
+    Serial.print (".");
+    Serial.println (rxBuff[2]);    
+    return;
+  }
+  
   Serial.print (" Received broadcast of ");
   Serial.print (bytes-6);
   Serial.print (" bytes from ");
