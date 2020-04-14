@@ -501,7 +501,7 @@ void loop() {
   busReadMode();
 
 //  Serial.println("\n-------------------------------\nEntering main loop");
-    Serial.println("\r\n----------------------\r\nEntering main loop");
+    Serial.println("\r\n--------------------------\r\nEntering main loop");
 
   nextEvent=millis()+1000;
 
