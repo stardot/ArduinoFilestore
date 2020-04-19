@@ -1616,6 +1616,8 @@ void fsSave(int txPort) {
   
   int maxTXSize = BUFFSIZE - 6;
 
+  if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
+
   // Set up the tables
   fSequence[fHdl] = 2;
   setfHandlePath(fHdl, fatPath);
@@ -1883,9 +1885,9 @@ void fsLoad(int txPort, boolean loadAs) {
   byte rxControlByte = 0x80;
 
   while (reqPtr < fileSize) {
-    int toFetch = (fileSize - reqPtr);
-    if (toFetch > (BUFFSIZE - 8)) toFetch = BUFFSIZE - 8; // Allow a few bytes for addressing
-
+    long toFetch = (fileSize - reqPtr);
+    if (isNetAUN[rxBuff[3]]) toFetch=MAXAUNPACKET;
+    
     int result = file.read(&txBuff[4], toFetch);
 
     reqPtr += toFetch;
@@ -2745,23 +2747,25 @@ void fsGetBytes(int txPort) {
 
   byte dataTXPort = rxBuff[6];
   byte fileHandle = rxBuff[9];
-  byte useOffset = rxBuff[10];
+  byte offsetStatus = rxBuff[10];
   long bytesToFetch = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
   long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
 
-  Serial.print(F(" - user "));
+  Serial.print(F(" - user = "));
   Serial.print(usrHdl);
-  Serial.print(F(" object handle "));
+  Serial.print(F(", object handle ="));
   Serial.print(fileHandle);
-  Serial.print(F(" txport "));
-  Serial.print(dataTXPort);
-  Serial.print(F(" bytes requested "));
+  Serial.print(F(", reply port = 0x"));
+  Serial.print(txPort,HEX);
+  Serial.print(F(", data port = 0x"));
+  Serial.print(dataTXPort,HEX);
+  Serial.print(F(", bytes requested = "));
   Serial.print(bytesToFetch);
-  Serial.print(F(" use offset "));
-  Serial.print(useOffset);
-  Serial.print(F(" offset "));
-  Serial.print(fileOffset);
-  Serial.print(F(" "));
+  if (!offsetStatus){
+    Serial.print(F(", offset ="));
+    Serial.print(fileOffset);
+    Serial.print(F(" - "));
+  } else Serial.print(F(", no offset - "));
 
   if (fileHandle == 0) {
     //Invalid file handle
@@ -2780,7 +2784,7 @@ void fsGetBytes(int txPort) {
   }
 
   // First move to location if required
-  if (useOffset == 0) {
+  if (!offsetStatus) {
     // Need to adjust file pointer
     if (!fHandle[fileHandle].seekSet(fileOffset)) {
       // seek failed for some reason
@@ -2802,7 +2806,7 @@ void fsGetBytes(int txPort) {
   txBuff[3] = config_Net;
   txBuff[4] = 0x00;
   txBuff[5] = 0x00;
-  if (txWithHandshake(6, txPort, rxControlByte)) Serial.print(F(""));
+  if (txWithHandshake(6, txPort, rxControlByte)) Serial.print(F("."));
   else {
     Serial.println(F("- Begin Failed"));
     return;
@@ -2812,8 +2816,8 @@ void fsGetBytes(int txPort) {
   byte rxControlByte = 0x80;
 
   while (reqPtr < bytesToFetch) {
-    int toFetch = (bytesToFetch - reqPtr);
-    if (toFetch > (BUFFSIZE - 8)) toFetch = BUFFSIZE - 8; // Allow a few bytes for addressing
+    long toFetch = (bytesToFetch - reqPtr);
+    if (isNetAUN[rxBuff[3]]) toFetch=MAXAUNPACKET;
 
     int result = fHandle[fileHandle].read(&txBuff[4], toFetch);
 
@@ -2822,12 +2826,13 @@ void fsGetBytes(int txPort) {
 
     bytesRead += result;
 
-    if (!txWithHandshake(toFetch + 4, dataTXPort, rxControlByte)) {
+    if (!txWithHandshake((int) toFetch + 4, dataTXPort, rxControlByte)) {
       Serial.print(F(" - block TX failed at "));
       Serial.println(reqPtr);
       return;
     }
   }
+
 
   // Have TXed right number of bytes, do closing message
   if (!fileError) {
@@ -2835,16 +2840,17 @@ void fsGetBytes(int txPort) {
     txBuff[1] = rxBuff[3];
     txBuff[2] = config_Station;
     txBuff[3] = config_Net;
-    txBuff[4] = 0x00;
-    txBuff[5] = 0x00;
+    txBuff[4] = 00; // Command code
+    txBuff[5] = 00; // Return code
     if (eofReached) txBuff[6] = 0x80; else txBuff[6] = 0x00;
 
-    txBuff[7] = bytesRead & 0xFF;
-    txBuff[8] = bytesRead >> 8 & 0xFF;
-    txBuff[9] = bytesRead >> 16 & 0xFF;
+    txBuff[7] = bytesRead;
+    txBuff[8] = bytesRead >> 8;
+    txBuff[9] = bytesRead >> 16;
+
     //Serial.print(F("About to tx close message "));
 
-    if (txWithHandshake(10, txPort, rxControlByte)) Serial.println(F(" ")); else Serial.println(F(" - completion Failed"));
+    if (txWithHandshake(10, txPort, rxControlByte)) Serial.println(F(". ")); else Serial.println(F(" - completion Failed"));
 
   } else {
 
@@ -2874,6 +2880,7 @@ void fsPutBytes(int txPort) {
   unsigned long bytesToWrite = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
   int maxTXSize = BUFFSIZE - 6;
+  if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
 
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
