@@ -259,8 +259,8 @@ void doImmediateOpRX(int rxSize){
 */
       txBuff[4]=0x0B;
       txBuff[5]=0x00;
-      txBuff[6]=0x02;
-      txBuff[7]=0x00;
+      txBuff[6]=0x00;
+      txBuff[7]=0x02;
       
       if (txFrame(8,false,false,true)) { Serial.println (" - Replied Filestore V2.00!"); } else { Serial.println (" - Reply failed!"); };
       

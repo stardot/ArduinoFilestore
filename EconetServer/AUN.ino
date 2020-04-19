@@ -89,8 +89,8 @@
       workBuff[0]=0x06; // Immediate operation reply
       workBuff[8]=0x0B; // Machine type 11 (Filestore) 
       workBuff[9]=0x00;
-      workBuff[10]=0x02; // Version
-      workBuff[11]=0x00;
+      workBuff[10]=0x00; // Version minor/major
+      workBuff[11]=0x02;
       
       if (aunUdp.beginPacket(currentAUNrxIP, aunUDPsrcPort)){
         aunUdp.write(workBuff, 12);
@@ -152,7 +152,7 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
   //Translate from Econet back to AUN
   workBuff[0]=2; // Data frame
   workBuff[1]=port;
-  workBuff[2]=controlByte;
+  workBuff[2]=controlByte & 0x7F; // 7th bit stripped in AUN
   workBuff[3]=0;
   
   memcpy(workBuff+8,txBuff+4,ecoFrameSize-4);
@@ -162,7 +162,7 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
   workBuff[4]=aunSeqNo;
   workBuff[5]=aunSeqNo >> 8;
   workBuff[6]=aunSeqNo >> 16;
-  workBuff[7]=aunSeqNo >> 24;
+  workBuff[7]=aunSeqNo >> 24;      
   
   if (aunUdp.beginPacket(currentAUNrxIP, aunUDPsrcPort)){
 
@@ -179,11 +179,12 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
 
       if (udpPacketSize==8){
         aunUdp.read(ackBuff,8);
-        if (ackBuff[0]==3 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) gotAck=true;
-      }
+        if (ackBuff[0]==3 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) gotAck=true; 
+        if (ackBuff[0]==4 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) Serial.print (F(" - AUN NAK")); 
+        } 
     }
 
-    if (!gotAck) return (false); // Failed to get ACK
+    if (!gotAck) return (false); // Failed to get ACK, or NAK returned
     
     // Success   
   } else { 
