@@ -2884,7 +2884,8 @@ void fsPutBytes(int txPort) {
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
   int maxTXSize = BUFFSIZE - 6;
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
-
+  if (!isNetAUN[rxBuff[3]]) maxTXSize=4090;
+  
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
 
