@@ -2817,7 +2817,10 @@ void fsGetBytes(int txPort) {
 
   while (reqPtr < bytesToFetch) {
     long toFetch = (bytesToFetch - reqPtr);
-    if (isNetAUN[rxBuff[3]]) toFetch=MAXAUNPACKET;
+
+    // Cap the packet size according to the media
+    if (isNetAUN[rxBuff[3]] && toFetch>MAXAUNPACKET) toFetch=MAXAUNPACKET;
+    if (!isNetAUN[rxBuff[3]] && toFetch>4090) toFetch=4090; // Maximum Econet packet 4K (+ allow for addressing)
 
     int result = fHandle[fileHandle].read(&txBuff[4], toFetch);
 
