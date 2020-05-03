@@ -33,7 +33,7 @@ void rxFrame(){
   
   ptr=2;
 
-  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.println("rS!");} ;
+  if (millis()>scoutTimeout && gotScout==true) { gotScout=false; Serial.print("^");} ;
 
   while (frame){     
    // Now check the status register
@@ -127,7 +127,7 @@ void ackRX(){
   txBuff[2]=rxBuff[0];
   txBuff[3]=rxBuff[1];
   
-  txFrame(4,false,false,false);  // And transmit it
+  if (!txFrame(4,false,false,false)) Serial.print("*");  // And transmit it
 
   return;
 }
@@ -372,8 +372,6 @@ boolean txFrame(int bytes, boolean getAck, boolean scout, boolean immediate){
     writeCR2(B11100101); // Raise RTS, clear TX and RX status, flag fill and Prioritise status
   }
 
-  delayMicroseconds(10); // Give the other clients a moment to notice the flag fill 
- 
   for(int buffPtr=0;buffPtr<bytes;buffPtr+=1){
    
     while(true){ // While not TDRA set, loop until it is - or we get an error
