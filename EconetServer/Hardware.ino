@@ -24,10 +24,7 @@ void initADLC(){
   do {} while (digitalReadDirect(PIN_Cf)==1) ; //Wait for clock phase to go low
 
   digitalWriteDirect(PIN_Cs,0); //Select
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+    do {} while (digitalReadDirect(PIN_Cf)==1) ; //Wait for clock phase to go low again
   digitalWriteDirect(PIN_Cs,1); //And deselect   
 
   // init Control Register 4 (CR4)
@@ -46,10 +43,7 @@ void initADLC(){
   do {} while (digitalReadDirect(PIN_Cf)==1) ; //Wait for clock phase to go low
 
   digitalWriteDirect(PIN_Cs,0); //Select
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+    do {} while (digitalReadDirect(PIN_Cf)==1) ; //Wait for clock phase to go low again
   digitalWriteDirect(PIN_Cs,1); //And deselect   
 
 
@@ -77,7 +71,6 @@ void writeCR1(char txbyte){
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
     digitalWriteDirect(PIN_Cs,1); //And deselect  
 }
 
@@ -97,7 +90,6 @@ void writeCR2(char txbyte){
     do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high
     do {} while (digitalReadDirect(PIN_Cf)==1) ; //Wait for clock phase to go low
     digitalWriteDirect(PIN_Cs,0); //Select
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
    __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
@@ -135,7 +127,11 @@ byte readSR1(){
   digitalWriteDirect(PIN_Rs0,0);// Select Status Register 0
   digitalWriteDirect(PIN_Rs1,0);
   digitalWriteDirect(PIN_Cs,0); //Select chip (active low)
-  do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high  
+//  do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high  
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
   ioPort = g_APinDescription[PIN_D0].pPort -> PIO_PDSR ; // I know all data pins are on the same port, so cheating here!
   digitalWriteDirect(PIN_Cs,1); //And deselect
 
@@ -150,7 +146,11 @@ byte readSR2(){
   digitalWriteDirect(PIN_Rs0,1);
   digitalWriteDirect(PIN_Rs1,0);
   digitalWriteDirect(PIN_Cs,0); //Select chip (active low)
-  do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high  
+  // do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high  
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
   ioPort = g_APinDescription[PIN_D0].pPort -> PIO_PDSR ; // I know all data pins are on the same port, so cheating here!
   digitalWriteDirect(PIN_Cs,1); //And deselect
 
@@ -165,8 +165,11 @@ byte readFIFO(){
   digitalWriteDirect(PIN_Rs0,0);// Select FIFO read status
   digitalWriteDirect(PIN_Rs1,1);  
   digitalWriteDirect(PIN_Cs,0); //Select
-  do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high
-
+  //do {} while (digitalReadDirect(PIN_Cf)==0) ; //Wait for clock phase to go high
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
   rawPort = g_APinDescription[PIN_D0].pPort -> PIO_PDSR ; // I know all data pins are on the same port, so cheating here!
   digitalWriteDirect(PIN_Cs,1); //And deselect
   return (rawPort >>1);
@@ -210,11 +213,6 @@ void busReadMode(){
   digitalWriteDirect(PIN_RnW,1); // Read is active high
   PIOC->PIO_ODR =510; // Shortcut to set input mode
 
-  // Allow bus to settle
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-  __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
   busWrite=false;
 }
 
@@ -224,12 +222,7 @@ void busWriteMode(){
   PIOC->PIO_OWER = 0x000001FE; // Mask out other addresses on the port
   REG_PIOC_ODSR = 0; // Clear output registers 
   digitalWriteDirect(PIN_RnW,0); // Write is active low
-  
-  // Allow bus to settle
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
-   __asm__("nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t""nop\n\t");
+
   busWrite=true;
 }  
 
