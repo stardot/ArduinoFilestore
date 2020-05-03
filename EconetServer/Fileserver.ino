@@ -1256,7 +1256,9 @@ void fsShutdown(byte txPort, bool reboot) {
   if (reboot) REQUEST_EXTERNAL_RESET; // Jump to hardware reset vector
 
   // if still here, put CPU to sleep until manually reset
-  pmc_enable_sleepmode(0);
+  do {
+    pmc_enable_sleepmode(0);
+  } while (true);
 
 }
 
@@ -4200,7 +4202,7 @@ void fsCdir(byte txPort, boolean oscli) {
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);
 
   if (sd.exists(pathBuff1)) {
-    //Object not found - send error and leave
+    //Object exits - send error and leave
     Serial.print(" - ");
 
     //But first work out if it's a file or directory..
@@ -4222,6 +4224,12 @@ void fsCdir(byte txPort, boolean oscli) {
 
   if (!sd.mkdir(pathBuff1)) {
     fsError(0xCC, "Bad directory name", txPort); // Meh, also not right.
+    return;
+  }
+
+  if (!file.open(pathBuff1, O_READ)) {
+    fsError(0xCC, "sd.mkdir failed without error, this suggests filesytem corruption", txPort); 
+    file.close();
     return;
   }
 
@@ -4659,6 +4667,8 @@ boolean createMetaFile(String path) {
 
   if (!file.open(pathBuff1, O_READ)) {
     // File open failed - return false
+    Serial.print(F(" createMetaFile Unable to open object "));
+    Serial.print(path);    
     return  (false);
   }
 
@@ -4680,6 +4690,8 @@ boolean createMetaFile(String path) {
     // Create meta folder if does not exist
     if (!sd.exists(pathBuff2)) {
       if (!sd.mkdir(pathBuff2)) {
+        Serial.print(F(" Unable to create metafile folder "));
+        Serial.print(path);
         return (false);
       }
     }
@@ -4687,7 +4699,7 @@ boolean createMetaFile(String path) {
     String metaName = path + "/$";
     metaName.toCharArray(pathBuff2, DIRENTRYSIZE);
 
-    Serial.print("(" + metaName + ")");
+    // Serial.print("(" + metaName + ")");
     if (file.open(pathBuff2, O_CREAT | O_WRITE)) {
       file.write(&loadAddress, 4);
       file.write(&execAddress, 4);
