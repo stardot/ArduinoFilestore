@@ -3025,7 +3025,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
 
   // delay(3); // Some clients don't like you answering too quickly!
 
-  if (gotBytes[fileHandle] != expectingBytes[fileHandle]) {
+  if (gotBytes[fileHandle] < expectingBytes[fileHandle]) {
     // Not all bytes received yet, send ack.
     txBuff[0] = rxBuff[2];
     txBuff[1] = rxBuff[3];
@@ -3034,7 +3034,11 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     txBuff[4] = 0x00; // Any byte can be sent as the ack
 
     if (!txWithHandshake(5, ackPort, rxControlByte)) {
-      Serial.println(F("Bulk transfer ack failed"));
+      Serial.print(F("Bulk transfer ack failed rx="));
+      Serial.print(gotBytes[fileHandle]);
+      Serial.print(F(" expecting="));
+      Serial.println(expectingBytes[fileHandle]);
+      
       // Clear out the ADLC before returning
       readFIFO();
       resetIRQ();
@@ -3097,7 +3101,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[8] = expectingBytes[fileHandle] << 8 ;
       txBuff[9] = expectingBytes[fileHandle] << 16;
 
-      if (!txWithHandshake(10, replyPort, rxControlByte)) Serial.print(F("Ack failed at end of put bulk transfer"));
+      if (!txWithHandshake(10, replyPort, rxControlByte)) Serial.println(F("Ack failed at end of put bulk transfer"));
     }   
   }
 }
