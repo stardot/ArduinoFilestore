@@ -2886,7 +2886,7 @@ void fsPutBytes(int txPort) {
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
   int maxTXSize = BUFFSIZE - 6;
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
-  if (!isNetAUN[rxBuff[3]]) maxTXSize=4090;
+  // if (!isNetAUN[rxBuff[3]]) maxTXSize=4090;
   
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
@@ -3005,6 +3005,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
   }
 
   int result = 0;
+  int xferred = (bytesRX - 4);
 
   // File handle seems OK
 
@@ -3013,14 +3014,12 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     Serial.print(" Duplicate sequence number - skipping write ");
   } else {
     // All good, write that byte!
-    int result = fHandle[fileHandle].write(&rxBuff[4], bytesRX - 4);
+    int result = fHandle[fileHandle].write(&rxBuff[4], xferred);
     // fHandle[fileHandle].sync();
 
     // Update byte count
-    gotBytes[fileHandle] += (bytesRX - 4);
+    gotBytes[fileHandle] += xferred;
 
-    // Update stored sequence number
-    //fSequence[fileHandle]=rxControlByte & 1;
   }
 
   // delay(3); // Some clients don't like you answering too quickly!
@@ -3032,12 +3031,15 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     txBuff[2] = config_Station;
     txBuff[3] = config_Net;
     txBuff[4] = 0x00; // Any byte can be sent as the ack
-
+   
     if (!txWithHandshake(5, ackPort, rxControlByte)) {
-      Serial.print(F("Bulk transfer ack failed rx="));
-      Serial.print(gotBytes[fileHandle]);
-      Serial.print(F(" expecting="));
-      Serial.println(expectingBytes[fileHandle]);
+      Serial.print(F("Bulk transfer ack failed (after "));
+      Serial.print(xferred);
+      Serial.println(F(" bytes)"));
+
+      // Move the file pointer back, as client will repeat the last tx (if still working)
+      fHandle[fileHandle].seekSet(-xferred);
+      gotBytes[fileHandle] -= xferred;
       
       // Clear out the ADLC before returning
       readFIFO();
@@ -3047,6 +3049,13 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
   } else {
     // All expected bytes received
 
+    if (gotBytes[fileHandle] > expectingBytes[fileHandle]) {
+      Serial.print(F("Additional bytes received! Received "));
+      Serial.print(gotBytes[fileHandle]);
+      Serial.print(F(" expecting "));
+      Serial.println(expectingBytes[fileHandle]);
+    }
+    
     if (result == -1) {
       // Transfer completed with a write failure
       fsError(0xFF, "Internal server error writing file", replyPort);
@@ -3097,11 +3106,15 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[4] = 0x00; // Command code
       txBuff[5] = 0x00; // result = OK
       txBuff[6] = 0x00; // Undefined content
-      txBuff[7] = expectingBytes[fileHandle];
-      txBuff[8] = expectingBytes[fileHandle] << 8 ;
-      txBuff[9] = expectingBytes[fileHandle] << 16;
+      txBuff[7] = gotBytes[fileHandle];
+      txBuff[8] = gotBytes[fileHandle] << 8 ;
+      txBuff[9] = gotBytes[fileHandle] << 16;
 
-      if (!txWithHandshake(10, replyPort, rxControlByte)) Serial.println(F("Ack failed at end of put bulk transfer"));
+      if (!txWithHandshake(10, replyPort, rxControlByte)) {
+        Serial.print(F("Ack failed at end of put bulk transfer (after "));
+        Serial.print(xferred);
+        Serial.println(F(" bytes)"));
+      }
     }   
   }
 }
