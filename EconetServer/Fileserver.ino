@@ -2820,9 +2820,13 @@ void fsGetBytes(int txPort) {
   while (reqPtr < bytesToFetch) {
     long toFetch = (bytesToFetch - reqPtr);
 
-    // Cap the packet size according to the media
+    if (toFetch > BUFFSIZE-4) toFetch=BUFFSIZE- 4; // Cap packet at maximum buffer size, minus the 4 bytes required for the Econet addresses.
+
+    // AUN packets need to be capped, due to the W5100 buffers    
     if (isNetAUN[rxBuff[3]] && toFetch>MAXAUNPACKET) toFetch=MAXAUNPACKET;
-    if (!isNetAUN[rxBuff[3]] && toFetch>4090) toFetch=4090; // Maximum Econet packet 4K (+ allow for addressing)
+
+    // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
+    if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && toFetch>4092) toFetch=4092; 
 
     int result = fHandle[fileHandle].read(&txBuff[4], toFetch);
 
@@ -2884,9 +2888,13 @@ void fsPutBytes(int txPort) {
   byte useOffset = rxBuff[10];
   unsigned long bytesToWrite = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
-  int maxTXSize = BUFFSIZE - 6;
+
+  // Allow packet to be maximum buffer size, minus the 4 bytes required for the Econet addresses.
+  int maxTXSize = BUFFSIZE - 4; 
+  // AUN packets need to be capped, due to the W5100 buffers 
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
-  // if (!isNetAUN[rxBuff[3]]) maxTXSize=4090;
+  // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
+  if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && maxTXSize>4092) maxTXSize=4092;
   
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
