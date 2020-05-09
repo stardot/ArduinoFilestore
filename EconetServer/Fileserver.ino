@@ -1616,9 +1616,14 @@ void fsSave(int txPort) {
   portToFile[dataPort]=fHdl;
   fileToPort[fHdl]=dataPort;
   
-  int maxTXSize = BUFFSIZE - 6;
-
+  // Allow packet to be maximum buffer size, minus the 4 bytes required for the Econet addresses.
+  int maxTXSize = BUFFSIZE - 4; 
+  
+  // AUN packets need to be capped, due to the W5100 buffers 
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
+
+  // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
+  if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && maxTXSize>4092) maxTXSize=4092;
 
   // Set up the tables
   fSequence[fHdl] = 2;
