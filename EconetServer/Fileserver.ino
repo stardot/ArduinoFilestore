@@ -3017,18 +3017,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
 
   // File handle seems OK
 
-  if (rxControlByte & 1 == fSequence[fileHandle]) {
-    // Have received a duplicate, discard the write
-    Serial.print(" Duplicate sequence number - skipping write ");
-  } else {
-    // All good, write that byte!
-    int result = fHandle[fileHandle].write(&rxBuff[4], xferred);
-    // fHandle[fileHandle].sync();
-
-    // Update byte count
-    gotBytes[fileHandle] += xferred;
-
-  }
+  // Update byte count
+  gotBytes[fileHandle] += xferred;
 
   // delay(3); // Some clients don't like you answering too quickly!
 
@@ -3040,13 +3030,22 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
     txBuff[3] = config_Net;
     txBuff[4] = 0x00; // Any byte can be sent as the ack
    
-    if (!txWithHandshake(5, ackPort, rxControlByte)) {
-      Serial.print(F("Bulk transfer ack failed (after "));
+    if (txWithHandshake(5, ackPort, rxControlByte)) {
+      if (rxControlByte & 1 == fSequence[fileHandle]) {
+        // Have received a duplicate, discard the write
+        Serial.print(" Duplicate sequence number - skipping write ");
+      } else {
+        // All good, write the received bytes
+        int result = fHandle[fileHandle].write(&rxBuff[4], xferred);
+        // fHandle[fileHandle].sync();  
+      }
+  
+    } else {
+  Serial.print(F("Bulk transfer ack failed (after "));
       Serial.print(xferred);
       Serial.println(F(" bytes)"));
 
-      // Move the file pointer back, as client will repeat the last tx (if still working)
-      fHandle[fileHandle].seekSet(-xferred);
+      // Roll back the transferred counter
       gotBytes[fileHandle] -= xferred;
       
       // Clear out the ADLC before returning
@@ -3092,9 +3091,12 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
 
       if (!txWithHandshake(9, replyPort, rxControlByte)) {
         Serial.println(F("Ack failed at end of save bulk transfer"));
-        return; // return without closing, as final frame may get sent again
+        return; // return without closing or writing, as final frame should be sent again if client still alive
       }
 
+      // Write the final bytes
+      int result = fHandle[fileHandle].write(&rxBuff[4], xferred);
+    
       // Close the filehandle and mark inactive in the table
       portInUse[rxPort]=false;
       portToFile[rxPort]=0;
@@ -3118,7 +3120,10 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[8] = gotBytes[fileHandle] << 8 ;
       txBuff[9] = gotBytes[fileHandle] << 16;
 
-      if (!txWithHandshake(10, replyPort, rxControlByte)) {
+      if (txWithHandshake(10, replyPort, rxControlByte)) {
+        // Write the final bytes
+        int result = fHandle[fileHandle].write(&rxBuff[4], xferred);
+      } else {
         Serial.print(F("Ack failed at end of put bulk transfer (after "));
         Serial.print(xferred);
         Serial.println(F(" bytes)"));
