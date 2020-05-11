@@ -420,6 +420,20 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   workingDir = getDirectoryPath(usrHdl, csd);
 
   String newDir = getStringFromRX(13, bytesRx - 13);
+  if (newDir.length()==0) newDir="&"; // Map a blank call to URD
+
+  // Rewrite paths if URD relative
+  if (newDir.startsWith("&")){
+    workingDir = getURD(usrHdl);
+    if (newDir.length()<3){
+      newDir="";
+    } else {
+      newDir=newDir.substring(3);
+    }
+  }
+  
+  String fatPath = convertToFATPath(newDir, workingDir, txPort);
+  
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" CSD: ");
@@ -427,7 +441,6 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
   Serial.print(" Lib: ");
   Serial.print(lib);
   if (library) Serial.print(" Requested library path: "); else Serial.print(" Requested csd path: ");
-  String fatPath = convertToFATPath(newDir, workingDir, txPort);
   Serial.print(fatPath);
 
   fatPath.toCharArray(pathBuff1, DIRENTRYSIZE);

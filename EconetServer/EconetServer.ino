@@ -20,7 +20,7 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 // Config values that have to be compiled in
 #define BUFFSIZE 16384 // Size of TX, RX and work buffers
 #define MAXDEPTH 25 // Maximum directory depth supported in CSD/LIB path
-#define DIRENTRYSIZE MAXDEPTH*11+2 // Each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
+#define DIRENTRYSIZE 277 // (MAXDEPTH*11+2) - each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
 #define MAXFILES 100 // Total maximum number of files and folders open
 #define MAXUSERS 10 // Total number of user sessions
 #define MAXAUNPACKET 1460 // Maximum AUN packet size due to W5100 stack (https://forum.wiznet.io/t/topic/5316)
