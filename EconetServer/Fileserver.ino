@@ -421,18 +421,7 @@ void fsChangeDir(byte txPort, String command, boolean library, int bytesRx) {
 
   String newDir = getStringFromRX(13, bytesRx - 13);
   if (newDir.length()==0) newDir="&"; // Map a blank call to URD
-
-  // Rewrite paths if URD relative
-  if (newDir.startsWith("&")){
-    workingDir = getURD(usrHdl);
-    if (newDir.length()<3){
-      newDir="";
-    } else {
-      newDir=newDir.substring(3);
-    }
-  }
-  
-  String fatPath = convertToFATPath(newDir, workingDir, txPort);
+  String fatPath = convertToFATPath(newDir, workingDir, txPort, usrHdl);
   
   Serial.print(" User: ");
   Serial.print(usrHdl);
@@ -525,10 +514,10 @@ void fsRename(byte txPort, int bytesRx) {
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" Old Filename: ");
-  String fatPathO = convertToFATPath(oldName, workingDir, txPort);
+  String fatPathO = convertToFATPath(oldName, workingDir, txPort, usrHdl);
   Serial.print(fatPathO);
   Serial.print(" New Filename: ");
-  String fatPathN = convertToFATPath(newName, workingDir, txPort);
+  String fatPathN = convertToFATPath(newName, workingDir, txPort, usrHdl);
   Serial.print(fatPathN);
 
   if (!hasUserAccess(usrHdl,fatPathO,false)){
@@ -611,7 +600,7 @@ void fsInfo(byte txPort, boolean abbreviated) {
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" Filename: ");
-  String fatPath = convertToFATPath(object, workingDir, txPort);
+  String fatPath = convertToFATPath(object, workingDir, txPort, usrHdl);
   Serial.print(fatPath);
 
   if (!hasUserAccess(usrHdl,fatPath,true)){
@@ -1157,7 +1146,7 @@ void fsSetUserRoot(byte txPort, int bytesRx) {
     return;
   }
 
-  String fatPath = convertToFATPath(newURD, config_FSRoot, txPort);
+  String fatPath = convertToFATPath(newURD, config_FSRoot, txPort, usrHdl);
 
   Serial.print(" (path: ");
   Serial.print(fatPath);
@@ -1532,7 +1521,7 @@ void fsSave(int txPort) {
 
 
   String objectName = getStringFromRX(20, 128);
-  String fatPath = convertToFATPath(objectName, workingDir, txPort);
+  String fatPath = convertToFATPath(objectName, workingDir, txPort, usrHdl);
 
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
@@ -1738,8 +1727,8 @@ void fsLoad(int txPort, boolean loadAs) {
   libraryPath = getDirectoryPath(usrHdl, rxBuff[8]);
 
   String objectName = getStringFromRX(9, 128);
-  String fatPath = convertToFATPath(objectName, workingDir, txPort);
-  String libfatPath = convertToFATPath(objectName, libraryPath, txPort);
+  String fatPath = convertToFATPath(objectName, workingDir, txPort, usrHdl);
+  String libfatPath = convertToFATPath(objectName, libraryPath, txPort, usrHdl);
 
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
@@ -1987,7 +1976,7 @@ void fsExamine(int txPort) {
   Serial.print(F(" onwards from folder "));
   Serial.print(pathName);
   Serial.print(F(" disk path "));
-  String fatPath = convertToFATPath(pathName, workingDir, txPort);
+  String fatPath = convertToFATPath(pathName, workingDir, txPort, usrHdl);
   Serial.print(fatPath);
 
   // No access control required, directories are always readable
@@ -2349,7 +2338,7 @@ void fsCatHeader(int txPort, int bytes) {
   Serial.print(F(", request dir "));
   Serial.print(dirName);
   Serial.print(F(" disk path "));
-  String fatPath = convertToFATPath(dirName, workingDir, txPort);
+  String fatPath = convertToFATPath(dirName, workingDir, txPort, usrHdl);
   Serial.print(fatPath);
 
   // No access control required, directories are always readable
@@ -2421,7 +2410,7 @@ void fsOpen(int txPort) {
   byte existingFile = rxBuff[9];
   byte readOnly = rxBuff[10];
   String objectName = getStringFromRX(11, 128);
-  String fatPath = convertToFATPath(objectName, workingDir, txPort);
+  String fatPath = convertToFATPath(objectName, workingDir, txPort, usrHdl);
 
   String pathName = getStringFromRX(12, 128);
   Serial.print(F(" - user "));
@@ -3534,7 +3523,7 @@ void fsReadObjectInfo(byte txPort) {
   workingDir = getDirectoryPath(usrHdl, rxBuff[7]);
 
 
-  String fatPath = convertToFATPath(pathName, workingDir, txPort);
+  String fatPath = convertToFATPath(pathName, workingDir, txPort, usrHdl);
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
   Serial.print(F(" dir handle "));
@@ -3779,7 +3768,7 @@ void fsSetObjectInfo(byte txPort) {
 
   // String pathName=(char*)userCSD;
   String pathName = getStringFromRX(bufpos, 128);
-  String fatPath = convertToFATPath(pathName, workingDir, txPort);
+  String fatPath = convertToFATPath(pathName, workingDir, txPort, usrHdl);
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
   Serial.print(F(" dir handle "));
@@ -3936,7 +3925,7 @@ void fsDelete(byte txPort, boolean oscli) {
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" Filename: ");
-  String fatPath = convertToFATPath(newDir, workingDir, txPort);
+  String fatPath = convertToFATPath(newDir, workingDir, txPort, usrHdl);
   Serial.print(fatPath);
 
   if (!hasUserAccess(usrHdl,fatPath,false)){
@@ -4238,7 +4227,7 @@ void fsCdir(byte txPort, boolean oscli) {
   Serial.print(" User: ");
   Serial.print(usrHdl);
   Serial.print(" new directory: ");
-  String fatPath = convertToFATPath(newDir, workingDir, txPort);
+  String fatPath = convertToFATPath(newDir, workingDir, txPort, usrHdl);
   Serial.print(fatPath);
 
   if (!fatPath.startsWith(getURD(usrHdl),0) && !isSystemUser(usrHdl)){
@@ -4344,7 +4333,7 @@ void fsCreateFile(int txPort) {
   fsize += rxBuff[17];
 
   String objectName = getStringFromRX(20, 128);
-  String fatPath = convertToFATPath(objectName, workingDir, txPort);
+  String fatPath = convertToFATPath(objectName, workingDir, txPort, usrHdl);
 
   Serial.print(F(" - user "));
   Serial.print(usrHdl);
@@ -4614,9 +4603,10 @@ void fsCloseUserFiles(int usrHdl) {
   }
 }
 
-String convertToFATPath(String pathName, String basedir, byte errorPort) {
+String convertToFATPath(String pathName, String basedir, byte errorPort, byte usrHdl) {
   String serverRoot = config_FSRoot;
   String result = pathName;
+  
   if (pathName.startsWith(":")) {
     // Disk name specified, check it's correct then remove it
     String diskName = pathName.substring(1, pathName.indexOf("."));
@@ -4632,6 +4622,17 @@ String convertToFATPath(String pathName, String basedir, byte errorPort) {
     };
   }
 
+  // Rewrite paths if URD relative
+  if (pathName.startsWith("&")){
+    basedir = getURD(usrHdl);
+    if (pathName.length()<3){
+      pathName="";
+    } else {
+      pathName=pathName.substring(3);
+    }
+    result=pathName;
+  }
+ 
   //if (result=="$") return "/"; // If just the root left, no more work to do
 
   result.replace(".", "\xFF"); //Swap the dot and slash
