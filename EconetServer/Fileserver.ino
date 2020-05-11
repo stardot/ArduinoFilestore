@@ -4606,6 +4606,10 @@ void fsCloseUserFiles(int usrHdl) {
 String convertToFATPath(String pathName, String basedir, byte errorPort, byte usrHdl) {
   String serverRoot = config_FSRoot;
   String result = pathName;
+
+  boolean chrootURD=false;
+
+  if (userPriv[usrHdl] == 0x40) chrootURD=true; // Fixed user cannot leave URD
   
   if (pathName.startsWith(":")) {
     // Disk name specified, check it's correct then remove it
@@ -4631,6 +4635,7 @@ String convertToFATPath(String pathName, String basedir, byte errorPort, byte us
       pathName=pathName.substring(3);
     }
     result=pathName;
+    chrootURD=true; // Result must be inside URD.
   }
  
   //if (result=="$") return "/"; // If just the root left, no more work to do
@@ -4674,6 +4679,8 @@ String convertToFATPath(String pathName, String basedir, byte errorPort, byte us
 
   // Check ServerRoot is present
   if (!result.startsWith(serverRoot)) result = serverRoot + result;
+
+  if (chrootURD && !result.startsWith(getURD(usrHdl))) result=getURD(usrHdl); // Force chroot user back into URD if they have somehow left
 
   return result;
 }
