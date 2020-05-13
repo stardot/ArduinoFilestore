@@ -1618,14 +1618,14 @@ void fsSave(int txPort) {
   portToFile[dataPort]=fHdl;
   fileToPort[fHdl]=dataPort;
   
-  // Allow packet to be maximum buffer size, minus the 4 bytes required for the Econet addresses.
-  int maxTXSize = BUFFSIZE - 4; 
+  // Allow packet to be maximum buffer size
+  int maxTXSize = BUFFSIZE; 
   
   // AUN packets need to be capped, due to the W5100 buffers 
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
 
-  // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
-  if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && maxTXSize>4092) maxTXSize=4092;
+  // Apply a 4K packet limit to Econet packet 
+  if (!isNetAUN[rxBuff[3]] && maxTXSize>4096) maxTXSize=4096;
 
   // Set up the tables
   fSequence[fHdl] = 2;
@@ -2896,13 +2896,13 @@ void fsPutBytes(int txPort) {
   unsigned long bytesToWrite = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
   unsigned long fileOffset = (rxBuff[16] << 16) + (rxBuff[15] << 8) + rxBuff[14];
 
-  // Allow packet to be maximum buffer size, minus the 4 bytes required for the Econet addresses.
-  int maxTXSize = BUFFSIZE - 4; 
+  // Allow packet to be maximum buffer size
+  int maxTXSize = BUFFSIZE; 
   // AUN packets need to be capped, due to the W5100 buffers 
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
-  // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
-  if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && maxTXSize>4092) maxTXSize=4092;
-  
+  // Apply a 4K packet limit to Econet packet
+  if (!isNetAUN[rxBuff[3]] && maxTXSize>4096) maxTXSize=4096;
+
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one
 
@@ -2978,7 +2978,7 @@ void fsPutBytes(int txPort) {
   txBuff[5] = 0x00; // Result OK
   txBuff[6] = dataPort;
   txBuff[7] = maxTXSize;
-  txBuff[8] = maxTXSize << 8;
+  txBuff[8] = maxTXSize >> 8;
   if (txWithHandshake(9, txPort, rxControlByte)) Serial.println(F(""));
   else {
     Serial.println(F("- setup TX Failed"));
@@ -3094,7 +3094,7 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[5] = 0x00; // result = OK
       txBuff[6] = 15; // TODO: correct attributes (hardcoded to allow all access, not locked)
       txBuff[7] = fsDate;
-      txBuff[8] = fsDate << 8 ;
+      txBuff[8] = fsDate >> 8 ;
 
       if (!txWithHandshake(9, replyPort, rxControlByte)) {
         Serial.println(F("Ack failed at end of save bulk transfer"));
@@ -3124,8 +3124,8 @@ void fsBulkRXArrived(int rxPort, int bytesRX) {
       txBuff[5] = 0x00; // result = OK
       txBuff[6] = 0x00; // Undefined content
       txBuff[7] = gotBytes[fileHandle];
-      txBuff[8] = gotBytes[fileHandle] << 8 ;
-      txBuff[9] = gotBytes[fileHandle] << 16;
+      txBuff[8] = gotBytes[fileHandle] >> 8 ;
+      txBuff[9] = gotBytes[fileHandle] >> 16;
 
       if (txWithHandshake(10, replyPort, rxControlByte)) {
         // Write the final bytes
@@ -3238,7 +3238,7 @@ void fsSetRandomAccessArgs(int txPort) {
 
   byte fileHandle = rxBuff[9];
   byte fileAction = rxBuff[10];
-  long fileValue = (rxBuff[13] << 16) + (rxBuff[12] << 8) + rxBuff[11];
+  long fileValue = (rxBuff[13]<<16) + (rxBuff[12]<<8) +rxBuff[11];
   byte extByte = 0;
 
   Serial.print(F(" - user "));
@@ -3276,16 +3276,29 @@ void fsSetRandomAccessArgs(int txPort) {
           }
         } else {
           // Seek within file failed!
-          fsError(0xFF, "Seek fail", txPort);
+          fsError(0xFF, "Set file pointer fail", txPort);
           return;
         }
       }
     } else if (fileAction == 1) {
       // Set file extent
-      //TODO: Check quota
-      // for (int thisByte=0;thisByte<fileValue;thisByte++){
-      //   fHandle[fileHandle].write(extByte);
-      // }
+      if ( fHandle[fileHandle].fileSize()>fileValue){
+        // File is too long 
+        //TODO: Release quota
+        if (!fHandle[fileHandle].truncate(fileValue)){
+          fsError(0xFF, "Extent set fail", txPort);
+          return;          
+        }
+      } else {
+        // File needs to be expanded
+        //TODO: Check quota
+          for (int thisByte = fHandle[fileHandle].fileSize(); thisByte < fileValue; thisByte++) {
+            if (!fHandle[fileHandle].write(extByte)){
+              fsError(0xFF, "Extent set fail", txPort);
+              return;               
+            }
+          }        
+      }
     } else {
       fsError(0xFF, "Unknown action", txPort);
     }
