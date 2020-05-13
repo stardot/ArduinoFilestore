@@ -19,7 +19,7 @@ Here is an overview of which NetFS operations are currently working
 | :heavy_check_mark:|  |	*SDisc [:]disc_spec| |
 | :heavy_check_mark: |	| *FSShutdown| |
 | :heavy_check_mark: |	| *FSReboot| |
-| |  |	*Logoff user_name\|user_number| |
+| :heavy_check_mark: |  |	*Logoff user_name\|user_number| |
 | :heavy_check_mark:|  |	*NewUser user_name| |
 | :heavy_check_mark:|  |	*Priv user_name [new_privilege]| |
 | :heavy_check_mark:|  |	*RemUser user_name| |
@@ -29,7 +29,7 @@ Here is an overview of which NetFS operations are currently working
 | :heavy_check_mark: |1|	Save file| |
 | :heavy_check_mark: |2|	Load file| |
 | :heavy_check_mark: |3|	Examine||
-| |4|	Catalogue header| |
+| :heavy_check_mark: |4|	Catalogue header| |
 |:heavy_check_mark: |5|	Load as| |
 |:heavy_check_mark: |6|	Open object| |
 |:heavy_check_mark: |7|	Close object| |
@@ -58,7 +58,7 @@ Here is an overview of which NetFS operations are currently working
 |:heavy_check_mark: |30|	Read user free space| Actually just returns disk space, as quotas not implemented|
 | |31|	Set user free space| |
 |:heavy_check_mark: |32|	Read client UserId| |
-| |33|	Read current users' info (extended)| |
+| :heavy_check_mark: |33|	Read current users' info (extended)| |
 | |34|Read user's information (extended)| |
 | |35| *Reserved*	| |
 | |36| 	Manager interface| |
