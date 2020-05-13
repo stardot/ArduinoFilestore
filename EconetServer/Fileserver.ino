@@ -1658,24 +1658,22 @@ void fsSave(int txPort) {
   file.write(attribs); 
   file.close();
 
-
-  if (fsize > 0) {
-    // Send an OK so station can start the bulk TX process
-    txBuff[0] = rxBuff[2];
-    txBuff[1] = rxBuff[3];
-    txBuff[2] = config_Station;
-    txBuff[3] = config_Net;
-    txBuff[4] = 0x00; // Command code 0
-    txBuff[5] = 0x00; // Result OK
-    txBuff[6] = dataPort;
-    txBuff[7] = maxTXSize;
-    txBuff[8] = maxTXSize << 8;
-    if (txWithHandshake(9, txPort, rxControlByte)) Serial.println(F(" "));
-    else {
-      Serial.println(F("- setup TX Failed"));
-      return;
-    };
-  } else {
+  // Send an OK so station can start the bulk TX process
+  txBuff[0] = rxBuff[2];
+  txBuff[1] = rxBuff[3];
+  txBuff[2] = config_Station;
+  txBuff[3] = config_Net;
+  txBuff[4] = 0x00; // Command code 0
+  txBuff[5] = 0x00; // Result OK
+  txBuff[6] = dataPort;
+  txBuff[7] = maxTXSize;
+  txBuff[8] = maxTXSize >> 8;
+  if (!txWithHandshake(9, txPort, rxControlByte)){
+    Serial.println(F("- setup TX Failed"));
+    return;
+  };
+    
+  if (fsize == 0) {
     // Zero size file saved - send ack
     // Send final ack and close off the filehandles.
     dir_t dirEntry;
@@ -1690,15 +1688,21 @@ void fsSave(int txPort) {
     txBuff[5] = 0x00; // result = OK
     txBuff[6] = 15; // TODO: correct attributes (hardcoded to allow all access, not locked)
     txBuff[7] = fsDate;
-    txBuff[8] = fsDate << 8 ;
-    if (txWithHandshake(9, txPort, rxControlByte)) Serial.println(F("")); else Serial.println(F("- Final Ack Failed"));
+    txBuff[8] = fsDate >> 8 ;
+    if (txWithHandshake(9, txPort, rxControlByte)) Serial.print(F(" - File closed")); else Serial.print(F("- Final ack Failed"));
 
-    // Close the filehandle and mark inactive in the table
-    fHandle[fHdl].truncate(expectingBytes[fHdl]); // Ensure file is correct size - might be overwriting existing file
+    // Close the port and filehandle
+    portInUse[fileToPort[fHdl]]=false;
+    portToFile[fileToPort[fHdl]]=0;
+    fileToPort[fHdl]=0;
+
+    fHandle[fHdl].truncate(0); // Ensure file is correct size - might be overwriting existing file
     fHandle[fHdl].close();
     userOpenFiles[usrHdl]--;
-    fHandleActive[fHdl] = false;
+    fHandleActive[fHdl] = false;   
   }
+  
+  Serial.println("");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
