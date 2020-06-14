@@ -23,7 +23,7 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 #define DIRENTRYSIZE 277 // (MAXDEPTH*11+2) - each directory has 10 chars plus a seperator. Also complete string has a root and terminating character.
 #define MAXFILES 100 // Total maximum number of files and folders open
 #define MAXUSERS 10 // Total number of user sessions
-#define MAXAUNPACKET 1460 // Maximum AUN packet size due to W5100 stack (https://forum.wiznet.io/t/topic/5316)
+#define MAXAUNPACKET 1460 // 1460 Maximum AUN packet size due to W5100 stack (https://forum.wiznet.io/t/topic/5316)
 
 IPAddress timeServer;
 
@@ -81,6 +81,7 @@ boolean portInUse[255];
 char fileToPort[MAXFILES];
 char portToFile[255];
 boolean isNetAUN[255];
+boolean w5500card;
 
 
 boolean busWrite = false; // Global flag to indicate data bus direction
@@ -327,6 +328,7 @@ void setup() {
        mask[2]=255;
        writeConfigValue("Netmask","255.255.255.0"); 
     }
+
  
     byte dns[] = {0, 0, 0, 0};
     config_DNS=readConfigValue("DNS");
@@ -355,7 +357,19 @@ void setup() {
     etherSelect();
     Ethernet.begin(mac,ip,dns,gateway,mask); 
   }    
+ 
+  if (Ethernet.hardwareStatus() == EthernetW5500) {
+    Serial.println("W5500 Ethernet controller detected.");
+    w5500card=true;
+  } else w5500card=false;
 
+  Serial.print("Ethernet maximum sockets: ");  
+  Serial.print(MAX_SOCK_NUM);  
+#if defined(ETHERNET_LARGE_BUFFERS)
+  Serial.print(" - large buffer support enabled");
+#endif
+  Serial.println("");
+   
   Serial.print("Ethernet config complete - IP address: ");
   Serial.println(Ethernet.localIP());
   
@@ -384,14 +398,18 @@ void setup() {
     Serial.println("Waiting for NTP time sync from "+String(ntpserver[0])+"."+String(ntpserver[1])+"."+String(+ntpserver[2])+"."+String(+ntpserver[3])+"...");
   
     int attempt=1;
-    while (year()==1970 && attempt<4){
+    setSyncProvider(getNtpTime);
+    setSyncInterval(86400); // Once a day
+
+    while (attempt<4 && timeStatus() != timeSet){
       setSyncProvider(getNtpTime);
       attempt++;
     }
-    if (year()==1970) Serial.print(" No reply!");
-  
-    setSyncInterval(86400); // Once a day
-
+    if (year()<1981){
+      Serial.println ("Bumping time to Econet epoch");
+      setTime(0,0,0,1,1,1981);
+    }
+    
     printTime();
     Serial.print(" ");
     printDate();
@@ -455,11 +473,9 @@ void setup() {
   // Initialise the Econet interface
   Serial.print("Initialising Econet controller....");
   initADLC();
+  printSR1(readSR1());
   Serial.println(" done.");
 
-
-
-  
   int ptr=0;
 
   // Initialise the user tables
@@ -486,6 +502,7 @@ void setup() {
     isNetAUN[ptr]=false;
   }
   isNetAUN[128]=true;
+
 }
 
 
