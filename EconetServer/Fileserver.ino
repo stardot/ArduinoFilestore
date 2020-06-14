@@ -2902,8 +2902,9 @@ void fsPutBytes(int txPort) {
 
   // Allow packet to be maximum buffer size
   int maxTXSize = BUFFSIZE; 
-  // AUN packets need to be capped, due to the W5100 buffers 
+  // AUN packets need to be capped, due to the Wiznet buffer size 
   if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
+  
   // Apply a 4K packet limit to Econet packet
   if (!isNetAUN[rxBuff[3]] && maxTXSize>4096) maxTXSize=4096;
 
@@ -2936,7 +2937,6 @@ void fsPutBytes(int txPort) {
   Serial.print(fileOffset);
   Serial.print(F(" max TX size "));
   Serial.print(maxTXSize);
-  Serial.print(F(" "));
 
   if (fileHandle == 0) {
     //Invalid file handle
@@ -4695,9 +4695,10 @@ String convertToFATPath(String pathName, String basedir, byte errorPort, byte us
   }  // End of while result contains /..
 
   // Check ServerRoot is present
-  if (!result.startsWith(serverRoot)) result = serverRoot + result;
+  if (!result.startsWith(serverRoot) && !chrootURD) result = serverRoot + result;
+  if (!result.startsWith(getURD(usrHdl)) && chrootURD) result = getURD(usrHdl) + result;
 
-  if (chrootURD && !result.startsWith(getURD(usrHdl))) result=getURD(usrHdl); // Force chroot user back into URD if they have somehow left
+  // if (chrootURD && !result.startsWith(getURD(usrHdl))) result=getURD(usrHdl); // Force chroot user back into URD if they have somehow left
 
   return result;
 }
