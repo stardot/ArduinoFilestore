@@ -284,7 +284,7 @@ boolean txWithHandshake(int lastByte, int port, int controlByte){
   while (attempt<txRetries){    
     if (txWithHandshakeInner(lastByte, port, controlByte)) return(true);
     attempt++;
-    Serial.print("R!");
+    Serial.print("!");
     delay(txRetryDelay);
   }
   return(false);
@@ -307,17 +307,10 @@ boolean txWithHandshakeInner(int lastByte, int port, int controlByte){
   if (!waitIdle()) { Serial.println("Line Jammed"); return(false);};
 
   // Send the scout (waitforack=true, scout=true, immediate=false)
-  if (!txFrame(6,true,true,false)) { 
-    Serial.print("S!"); 
-    return(false); 
-  } 
-
-//  if (!waitForAck()) {return(false);};
+  if (!txFrame(6,true,true,false)) return(false); 
   
   // Now send the payload data (waitforack=true, scout=false, immediate=false)
   if (!txFrame(lastByte,true,false,false)) return(false);
-
-//  if (!waitForAck()) {return(false);};
     
   return(true);
 }
@@ -346,7 +339,6 @@ boolean waitIdle(){
     }
     
     if (millis()>timeOut){
-      Serial.println("Network not idle for txBeginTimeout milliseconds - Line Jammed");
       return(false);
     }
 

@@ -180,7 +180,7 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
       if (udpPacketSize==8){
         aunUdp.read(ackBuff,8);
         if (ackBuff[0]==3 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) gotAck=true; 
-        if (ackBuff[0]==4 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) Serial.print (F(" - AUN NAK")); 
+        if (ackBuff[0]==4 && ackBuff[4]==workBuff[4] && ackBuff[5]==workBuff[5] && ackBuff[6]==workBuff[6] && ackBuff[7]==workBuff[7]) Serial.print ("*"); 
         } 
     }
 
