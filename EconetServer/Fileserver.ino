@@ -1622,10 +1622,10 @@ void fsSave(int txPort) {
   int maxTXSize = BUFFSIZE; 
   
   // AUN packets need to be capped, due to the W5100 buffers 
-  if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
+  if (isNetAUN(rxBuff[3])) maxTXSize=MAXAUNPACKET;
 
   // Apply a 4K packet limit to Econet packet 
-  if (!isNetAUN[rxBuff[3]] && maxTXSize>4096) maxTXSize=4096;
+  if (!isNetAUN(rxBuff[3]) && maxTXSize>4096) maxTXSize=4096;
 
   // Set up the tables
   fSequence[fHdl] = 2;
@@ -1899,7 +1899,7 @@ void fsLoad(int txPort, boolean loadAs) {
 
   while (reqPtr < fileSize) {
     long toFetch = (fileSize - reqPtr);
-    if (isNetAUN[rxBuff[3]]) toFetch=MAXAUNPACKET;
+    if (isNetAUN(rxBuff[3])) toFetch=MAXAUNPACKET;
     
     int result = file.read(&txBuff[4], toFetch);
 
@@ -2834,10 +2834,10 @@ void fsGetBytes(int txPort) {
     if (toFetch > BUFFSIZE-4) toFetch=BUFFSIZE- 4; // Cap packet at maximum buffer size, minus the 4 bytes required for the Econet addresses.
 
     // AUN packets need to be capped, due to the W5100 buffers    
-    if (isNetAUN[rxBuff[3]] && toFetch>MAXAUNPACKET) toFetch=MAXAUNPACKET;
+    if (isNetAUN(rxBuff[3]) && toFetch>MAXAUNPACKET) toFetch=MAXAUNPACKET;
 
     // Apply a 4K packet limit to Econet packet if sending to a non zero network that's remote.
-    if (!isNetAUN[rxBuff[3]] && rxBuff[3]!=0 && rxBuff[3]!= config_Net && toFetch>4092) toFetch=4092; 
+    if (!isNetAUN(rxBuff[3]) && rxBuff[3]!=0 && rxBuff[3]!= config_Net && toFetch>4092) toFetch=4092; 
 
     int result = fHandle[fileHandle].read(&txBuff[4], toFetch);
 
@@ -2903,10 +2903,10 @@ void fsPutBytes(int txPort) {
   // Allow packet to be maximum buffer size
   int maxTXSize = BUFFSIZE; 
   // AUN packets need to be capped, due to the Wiznet buffer size 
-  if (isNetAUN[rxBuff[3]]) maxTXSize=MAXAUNPACKET;
+  if (isNetAUN(rxBuff[3])) maxTXSize=MAXAUNPACKET;
   
   // Apply a 4K packet limit to Econet packet
-  if (!isNetAUN[rxBuff[3]] && maxTXSize>4096) maxTXSize=4096;
+  if (!isNetAUN(rxBuff[3]) && maxTXSize>4096) maxTXSize=4096;
 
   byte dataPort=fileToPort[fileHandle]; // Use existing port for filehandle if available
   if (!dataPort) dataPort=getNextAvailPort(); // if not set, then acquire one

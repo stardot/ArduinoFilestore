@@ -24,6 +24,7 @@ String config_etherMAC, config_IP, config_Netmask, config_DNS, config_Gateway, c
 #define MAXFILES 100 // Total maximum number of files and folders open
 #define MAXUSERS 10 // Total number of user sessions
 #define MAXAUNPACKET 1460 // 1460 Maximum AUN packet size due to W5100 stack (https://forum.wiznet.io/t/topic/5316)
+#define MAXAUNNETWORKS 5 // Maximum number of AUN networks on network map
 
 IPAddress timeServer;
 
@@ -80,7 +81,7 @@ char confBuff[255];
 boolean portInUse[255];
 char fileToPort[MAXFILES];
 char portToFile[255];
-boolean isNetAUN[255];
+byte aunNetMap[MAXAUNNETWORKS*4];
 boolean w5500card;
 
 
@@ -372,6 +373,21 @@ void setup() {
    
   Serial.print("Ethernet config complete - IP address: ");
   Serial.println(Ethernet.localIP());
+
+
+  
+  // Initialise the AUN mapping table- this needs to go into config
+  IPAddress myIP=Ethernet.localIP();
+
+  Serial.println("Building default AUN table ");
+  aunNetMap[0]=128; // mapped network
+  aunNetMap[1]=myIP[0];
+  aunNetMap[2]=myIP[1];
+  aunNetMap[3]=myIP[2];
+  aunNetMap[4]=0; // End of table
+
+  sprintf(confBuff,"%u.x = %u.%u.%u.x",aunNetMap[0],aunNetMap[1],aunNetMap[2],aunNetMap[3]);
+  Serial.println(confBuff);
   
   if (!aunUdp.begin(aunUDPsrcPort)){
     Serial.println("AUN UDP port open failed - halting ");
@@ -497,11 +513,7 @@ void setup() {
   }
   portInUse[0x99]=true; // Mark fileserver port in use
 
-  // Initialise the AUN mapping - this needs to go into config
-  for (ptr=0; ptr<256; ptr++){
-    isNetAUN[ptr]=false;
-  }
-  isNetAUN[128]=true;
+
 
 }
 

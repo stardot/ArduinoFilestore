@@ -293,7 +293,7 @@ boolean txWithHandshake(int lastByte, int port, int controlByte){
 boolean txWithHandshakeInner(int lastByte, int port, int controlByte){
 
   // If destination is an AUN network, sent to AUN tx instead
-  if (isNetAUN[txBuff[1]]) return (txAUNframe(port, controlByte, lastByte)); 
+  if (isNetAUN(txBuff[1])) return (txAUNframe(port, controlByte, lastByte)); 
   
   //First generate the scout  
   scoutBuff[0]=txBuff[0];

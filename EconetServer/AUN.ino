@@ -115,6 +115,14 @@ void rxAUNframe(int frameSize){
   
   if (!portInUse[workBuff[1]]) return; // Not expecting a frame on that port
 
+  // Check IP maps to an AUN network
+  int aunNet=getAUNNetForIP(currentAUNrxIP);
+
+  if (aunNet==0){ 
+    Serial.print(F("- Source IP does not map to AUN network, ignoring! "));
+    return;
+  } 
+
   // Send acknowledgement
   workBuff[0]=3; //ACK frame
   if (!aunUdp.beginPacket(currentAUNrxIP, aunUDPsrcPort)){
@@ -132,7 +140,7 @@ void rxAUNframe(int frameSize){
   rxBuff[0]=0; // dest address doesn't matter - as the packet is here now
   rxBuff[1]=0;
   rxBuff[2]=currentAUNrxIP[3]; // src address
-  rxBuff[3]=currentAUNrxIP[2];
+  rxBuff[3]=aunNet;
   
   memcpy(rxBuff+4,workBuff+8,frameSize-8);
 
@@ -193,4 +201,22 @@ boolean txAUNframe(int port, int controlByte, int ecoFrameSize){
   };    
 
   return (true);
+}
+
+boolean isNetAUN(int net){
+  if(net==0) return (false); // Local net can't be AUN
+  
+  for (int index=0; index<MAXAUNNETWORKS ; index++){
+    if (aunNetMap[index*4]=0) return (false); // Reached end of table
+    if (aunNetMap[index*4]=net) return (true); // Network in table
+  }
+  return (false);
+}
+
+byte getAUNNetForIP(IPAddress ip){
+  for (int index=0; index<MAXAUNNETWORKS ; index++){
+    if (aunNetMap[index*4]==0) return (0); // Reached end of table
+    if (aunNetMap[index*4+1]==ip[0] && aunNetMap[index*4+2]==ip[1] &&aunNetMap[index*4+3]==ip[2]) return (aunNetMap[index*4]); // Network in table
+  }    
+  return (0);
 }
